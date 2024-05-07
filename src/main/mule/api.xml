@@ -341,7 +341,7 @@ payload]]></ee:set-payload>
         </ee:transform>
     </flow>
     <flow name="get:\customerno\lasttimestamp:api-config">
-        <logger level="INFO" message="get:\customerno\lasttimestamp:api-config" />
+        <logger level="INFO" message="get:\customerno\lasttimestamp:api-config.." />
         <os:retrieve doc:name="Retrieve" doc:id="559add67-0218-4199-b63f-570632b77ed3" key="customernumber" objectStore="LastTimeStampObjectStore">
             <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
         </os:retrieve>
