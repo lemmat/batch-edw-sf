@@ -1,0 +1,17 @@
+db:
+  password: "$fd4"
+tls:
+  password: "password"
+sf:
+  password: "![HUW17SLFkHKcO/0mPT4X0A==]"
+  token: "![abGGtTO8dVLQSYVNfA/+5sEgpem5pXMzeef3I9fWWN0=]"
+  ps:
+    password: "![HUW17SLFkHKcO/0mPT4X0A==]"
+    token: "![abGGtTO8dVLQSYVNfA/+5sEgpem5pXMzeef3I9fWWN0=]"
+smtp:
+  password: "aU&X8ed7ky5c2HM#"
+pardot:
+  client_secret: "DCCFA19A5E001A90BCABBD8DDAD31AEF0BFD1B12167A89FC70241A36DB43CE30"
+system:
+  mcmc:
+    token: "![jxOX+OtBZhUFVmDl6umuZbS0VSDSKTOgkHiw8XUK/WE=]"

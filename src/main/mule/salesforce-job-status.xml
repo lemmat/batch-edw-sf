@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="sf-status-impl" doc:id="d1ec8184-734c-47fb-9a0a-b1987ad860fb" >
+		<salesforce:get-job-state-bulk-api-v2 doc:name="Get job state bulk api v 2" doc:id="c5bd3f0d-9849-4c32-97e8-dc300a3cad34" config-ref="Salesforce_Config" id="#[attributes.queryParams.Id default payload.id]"/>
+		<ee:transform doc:name="Transform Message" doc:id="c751800c-ebf5-4f7b-b081-c2a061fbf61e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="sf-failure-impl" doc:id="8e46322b-f262-4625-99de-dd1a625216a8" >
+		<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v 2" doc:id="214097eb-ef8e-4bd5-8fb5-c03a7be9ab81" config-ref="Salesforce_Config" id="#[attributes.queryParams.Id default payload.id]"/>
+		<ee:transform doc:name="Transform Message" doc:id="7919d8d7-2b20-4772-84b5-b7713867a931" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="sf-success-impl" doc:id="56c94729-2828-4fca-a2b2-7f503313e774" >
+		<salesforce:retrieve-job-successful-results-bulk-v2 doc:name="Retrieve job successful results bulk v 2" doc:id="a20d4021-66b0-4296-a171-ca2669c802ef" config-ref="Salesforce_Config" id="#[attributes.queryParams.Id default payload.id]"/>
+		<ee:transform doc:name="Transform Message" doc:id="e092a937-f9d4-4189-a863-6a12845758ca" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+</mule>

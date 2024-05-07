@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<flow name="account-manager"
+		doc:id="70e2a10d-9685-421f-b517-5af403d7cd2c">
+		<scheduler doc:name="1_Scheduler" doc:id="79dfce3c-3f3e-4ed3-899e-0e80eb7e025a" >
+			<scheduling-strategy >
+				<cron expression="0 0 14,18,20 1/1 * ? *" />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger"
+			doc:id="b472d5c0-9fa6-4d71-9be0-16d7dadd279e"
+			message="Job Triggered for AccountManager" />
+		<set-variable value="AccountManager" doc:name="Set job Variable" doc:id="049923eb-d55d-4cfd-b188-f6dd0d65fe79" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="18f5413e-a997-40b5-919d-7b6498eb436f" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve Last_update_date"
+			doc:id="7786db7d-dd98-467c-af3e-8c24f739e472" key="accountmanager"
+			objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="911f82da-cf5e-4125-a470-1b7166461042" >
+			<when expression="#[(vars.isNightly default false) == true]">
+				<set-variable value="#[p('sql.nightly.accounts.manager.retrieve')]" doc:name="Set sqlStatement Variable" doc:id="b51ad5f2-079c-49ad-b95c-0819483e01e7" variableName="sqlStatement" />
+			</when>
+			<otherwise >
+				<set-variable value="#[p('sql.accounts.manager.retrieve')]" doc:name="Set sqlStatement Variable" doc:id="2e086bb5-b22b-4fef-9ed0-716eae75361a" variableName="sqlStatement" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger"
+			doc:id="3e14b9db-13ca-47bd-86dd-dea4f2c44eb3"
+			message="AccountManager Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]" />
+		<db:select doc:name="Select Accounts Manager" doc:id="2081002a-5ebf-41a7-a8f0-e0d8834faa0c" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload"
+			doc:id="620a085a-9233-4f6c-93f7-fa294bb72b62">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="account-manager-batch-job"
+			doc:id="7811467e-4749-403d-93af-974e4022e70a" maxFailedRecords="-1"
+			blockSize="${batch.accountmanager.blocksize}"
+			maxConcurrency="${batch.accountmanager.concurrency}" jobInstanceId='#["accountmanager-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records>
+				<batch:step name="Batch_Step"
+					doc:id="57580ac4-2482-4ff1-9146-c9ae97fecdd3">
+					<batch:aggregator doc:name="Batch Aggregator"
+						doc:id="6837930a-795c-4a09-83f7-cd006f8d54b1"
+						size="${batch.accountmanager.batch}">
+						<ee:transform doc:name="payload"
+							doc:id="37eb52e1-9579-4118-b8de-8966db17a7a8">
+							<ee:message>
+								<ee:set-payload
+									resource="dw/account-manager-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful
+							maxRetries="#[p('sf.retry') as Number]"
+							doc:name="Until Successful"
+							doc:id="b5f83aa4-cb4a-4ddc-8d7d-a09b0ac95087"
+							millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2
+								doc:name="AccountManager"
+								doc:id="6bd88c85-c6eb-42df-aced-0396f60451ef"
+								config-ref="Salesforce_Config" objectType="Account_Manager__c"
+								externalIdFieldName="External_ID__c" operation="upsert"
+								columnDelimiter="CARET" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="b2b2c0e4-96ac-4950-bcaf-bc0499d99fc2" message="AccountManager UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="1a070f02-49de-47b8-8430-e0673db525fd" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="8d3d80eb-35bf-42a2-b67d-e453e7c08657" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="28ef9c5c-63f0-4fc4-aedb-1354eb7370c5" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="db77b175-99a5-42e7-8fd4-6310c6f53abf" size="${batch.accountmanager.batch}">
+						<ee:transform doc:name="AccountManager" doc:id="9f017bd7-69ef-4afc-b467-70761c3edfbe" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "AccountManager records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "AccountManager records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/account-manager-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="3402a281-dfa2-4ed3-9797-50db39d2753d" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="8f176aaa-5f2c-4d95-af80-9899d095f04a" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="8cf0cc7d-9b84-463d-bed0-8c6fc593d9fd" key="accountmanager" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[(vars.currentUpdateDate - |PT2H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="28cdacad-f50e-4d3f-820c-2b62ab0b7edc" message="Job End for AccountManager : #[payload]"/>
+				<choice doc:name="Choice" doc:id="cc417073-b395-464a-abee-aaae3cea43c4" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="8eb763ed-9129-449e-97d3-b0805ba2fe2f" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="f4e6fff0-f55f-4dcc-993a-208b490ec95b" >
+							<flow-ref doc:name="saleswarehouse Reference" doc:id="7b22680f-aaee-413a-8874-53e416ef609a" name="saleswarehouse" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="account-manager-relationship" doc:id="a949adff-e7d9-4ee2-9ada-ade774085d1d" >
+		<!-- <scheduler doc:name="8_Scheduler" doc:id="ea1d00a9-45de-4974-b55e-96007c6f6943" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger" doc:id="8b325e1a-e4cb-4852-b0c7-c0d964ad8328" message="Job Triggered for AccountManagerRelationship"/>
+		<set-variable value="acccountmanagerrelationship" doc:name="Set job Variable" doc:id="abacdfeb-4fe2-4f7e-acf2-f413280bcba6" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="87ed8d6a-5afa-417c-9773-d6ec4f9fa87b" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve accountmanagerrelationship" doc:id="8e786a33-709e-4511-9b66-1300cd137d3a" key="accountmanagerrelationship" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="a413bcc1-95b5-46b8-998f-c0171d4370b7" >
+			<when expression="#[(vars.isNightly default false) == true]">
+				<set-variable value="#[p('sql.nightly.accounts.manager.relationship')]" doc:name="Set sqlStatement Variable" doc:id="31dd7ac8-9903-4fed-83cf-e1244e8b1e25" variableName="sqlStatement" />
+			</when>
+			<otherwise >
+				<set-variable value="#[p('sql.accounts.manager.relationship')]" doc:name="Set sqlStatement Variable" doc:id="a6318349-7a94-46b2-af97-a2d11cfaceed" variableName="sqlStatement" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="8e85d321-32cd-4b24-b307-08c785e6f9ff" message="AccountManagerRelationShip Statement:  #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select AccountManagerShipTo" doc:id="e3827fe5-05a2-46c4-acd0-fc642ffdce4e" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="9aaf561e-855d-43f9-aaad-74e741ca27a5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="account-manager-relationship-batch-job" doc:id="6129505b-a6d7-4ee0-8c11-21fbe0dde1ca" maxFailedRecords="-1" blockSize="${batch.accountmanagerrelationship.blocksize}" maxConcurrency="${batch.accountmanagerrelationship.concurrency}" jobInstanceId='#["accountmanagerrelationship-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="8940ec99-4c1e-426d-ada4-9ef0566b13cd" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="5cd97219-6be3-40c1-8338-73f3ffdf4df9" size="${batch.accountmanagerrelationship.batch}">
+						<ee:transform doc:name="payload" doc:id="4b6ca395-474e-4d4a-abb1-e349578805f1" >
+							<ee:message >
+								<ee:set-payload resource="dw/account-manager-relationship.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="89c955c6-6982-45df-a4e4-eb503febb298" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="da8ec1c8-9aad-4947-8496-f6add67e821b" config-ref="Salesforce_Config" objectType="Account_Manager_ID__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="fead5b11-fd5a-4975-91e2-2eb351c767db" message="AccountManagerRelationship UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="6df84520-abc9-4022-91f5-e81e77eba2c5" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="8d5906fd-7800-4ae2-b34b-9076e9196389" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="3edf4cad-82af-4f2c-af9d-d1a5c640a610" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="76f8280f-93b9-4d3f-b599-e12cecba7d7e" size="${batch.accountmanagerrelationship.batch}">
+						<ee:transform doc:name="AccountManagerRelationship" doc:id="8f21bbd5-ecaa-4180-8096-4acde28a9b2a" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "AccountManagerRelationship records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "AccountManagerRelationship records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/account-manager-relationship.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="5656765f-56d4-4850-83b1-9151b21a3dd6" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="f7a45515-6512-45a9-8968-c235eb4dcfb1" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store accountmanagerrelationship" doc:id="3babc5cd-e77a-4ddd-9206-1fcfd4585193" key="accountmanagerrelationship" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[(vars.currentUpdateDate - |PT2H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="4e7ea76d-fb82-4a1a-b301-805740468a7e" message="Job End for AccountManagerRelationship : #[payload]"/>
+				<choice doc:name="Choice" doc:id="5752144e-bd2f-40d6-8f4c-2323b4ac4b5d" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="86d7c1f1-77fe-4695-b0e2-defaf640e5b2" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="857ad8a0-fb23-47f9-9538-ca9c56f11bf1" >
+							<flow-ref doc:name="spatask Reference" doc:id="277e7ab3-6e44-468c-8579-af7d93660a43" name="spatask" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+</mule>

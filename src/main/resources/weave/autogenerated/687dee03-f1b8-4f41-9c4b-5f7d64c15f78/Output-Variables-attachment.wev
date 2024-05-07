@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_687dee03_f1b8_4f41_9c4b_5f7d64c15f78_Output_Variables_attachment = Array<{|  Id: String | Null,   External_ID__c: String | Null,   ErrorMessage: String|}>
+

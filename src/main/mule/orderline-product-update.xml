@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="orderlines-failed-pricebook" doc:id="fdb50d5d-aa7f-416c-8fd2-f1d377fe2909">
+		<scheduler doc:name="Scheduler" doc:id="a33e3fb8-618d-4ff6-b388-6cc61933146f" >
+			<scheduling-strategy >
+				<cron expression="0 50 0/3 1/1 * ? *" />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="9f283340-5a09-4e80-9e14-2d8128c3b66f" message="Job Triggered for OrderLine-Failed-Pricebook"/>
+		<set-variable value="orderlines-failed-pricebook" doc:name="Set job Variable" doc:id="ac6a7df8-58ee-4c9e-ac70-22ff54912658" variableName="job"/>
+		<set-variable value="#[(now() &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="ab870c66-503e-4cf8-8464-1dde54ed8518" variableName="currentUpdateDate"/>
+		<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="18347d73-4b9b-4349-af6c-660768b20601" objectStore="UpdateProductOrderLineobjectStore" />
+		<foreach doc:name="For Each" doc:id="a93122ec-b11b-4162-92ce-fdeac557105d" >
+			<set-variable value="#[payload]" doc:name="Set jobName Variable" doc:id="3714a6d2-e4b4-41b4-9b3c-437859c9660e" variableName="jobName"/>
+			<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v 2" doc:id="7c332a7a-8b7f-48ad-ae3d-dccd06325bc2" config-ref="Salesforce_Config" id="#[payload]" />
+			<ee:transform doc:name="payload" doc:id="20b4abd1-01bf-43ef-97c5-9305e236a24f">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+(payload filter ($.errorMessage contains "INVALID_FIELD_FOR_INSERT_UPDATE:Unable to create/update fields: PricebookEntryId")) map ((item, index) -> {
+	Id: item.id,
+	((item.originalFields default {
+	}) - "Order.External_ID__c" - "Product2.External_ID__c" - "PricebookEntryId")
+})]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<choice doc:name="Choice" doc:id="4405589a-368d-461a-88e7-7c632f8d9a18" >
+				<when expression="#[isEmpty(payload)]">
+					<os:remove doc:name="Remove" doc:id="77d4808f-739c-454e-819f-4a37cb072988" key="#[vars.jobName]" objectStore="UpdateProductOrderLineobjectStore" />
+				</when>
+				<otherwise >
+					<batch:job jobName="orderline-product-update-batch-job" doc:id="d0e73386-46ea-4432-85f0-628401ad3391" maxFailedRecords="-1" blockSize="${batch.orderlines.blocksize}" maxConcurrency="${batch.orderlines.concurrency}" jobInstanceId='#["orderline-product-update-batch-job-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records>
+				<batch:step name="Batch_Step" doc:id="32663270-a206-4412-9a9e-707afe813939">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="a272efe8-f407-4299-943d-91564ad859c6" size="${batch.orderlines.batch}">
+						<ee:transform doc:name="payload" doc:id="174092bc-5f83-44f8-9de6-7c96d39a87ea">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/csv separator = '^'
+---
+payload]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+							<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="6dfad0b5-22e0-4836-be0e-822fa58f77e6" millisBetweenRetries="${sf.interval}">
+								<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="9c7e625e-4418-4988-abde-21eac82145c9" config-ref="Salesforce_Config" objectType="OrderItem" operation="update" columnDelimiter="CARET" externalIdFieldName="External_ID__c" />
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="63760216-a887-4c61-84e4-d9abbcf3aab5" message="OrderLines UpsertResponse: #[output application/json --- payload]" />
+						<os:store doc:name="jobId" doc:id="92ad5720-2d0a-4b59-97f5-15de5285e919" key="#[vars.job]" objectStore="CommonbjectStore">
+							<os:value><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status-product-retry Reference" doc:id="b0f999d6-b301-46f0-95e5-a4efa45399bf" name="check-status-product-retry" />
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="33c022fe-4376-4c42-8f46-3d7e3dab3321">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="19a2bced-8bf4-4740-a2c6-b370dad7f8ac" message="Job End for orderlines-failed-pricebook: #[payload]" />
+					<os:remove doc:name="Remove" doc:id="6901315e-b3bf-494e-b036-32e5a5e03b9c" key="#[vars.jobName]" objectStore="UpdateProductOrderLineobjectStore" />
+			</batch:on-complete>
+		</batch:job>
+				</otherwise>
+			</choice>
+		</foreach>
+		<logger level="INFO" doc:name="Logger" doc:id="1d35a96f-afe3-4c45-a1b8-95327e08533b" message="Job Ended for OrderLine-Failed-Pricebook"/>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+</mule>

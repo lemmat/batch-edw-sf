@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	
+	
+	<flow name="mcFlow" doc:id="ac34d7bb-c8e2-4e65-8f5b-30ab489a0d25" >
+		<scheduler doc:name="Scheduler" doc:id="eb8b5fcc-0e7e-43da-926a-181769bf192d" >
+			<scheduling-strategy >
+				<cron timeZone="America/New_York" expression="0 0 10 * * ? *"/>
+			
+</scheduling-strategy>
+		</scheduler>
+		<!-- <http:listener doc:name="Listener" doc:id="b91eabd5-f6b0-4f1a-b00b-80e9bfa08b08" config-ref="api-httpListenerConfig" path="/mc"/> -->
+		<logger level="INFO" doc:name="MC Job Start" doc:id="d507369e-9b2f-4ca6-9840-73852e1f4365" message="Job Started for McNaughton-McKay"/>
+		<set-variable value="#[(now() &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ssz&quot;}]" doc:name="currentDateTime" doc:id="3f36174b-c8cc-4ca6-b9a7-a3205a69abf2" variableName="currentDateTime" />
+		<os:retrieve doc:name="Retrieve lastDateTime" doc:id="ed38a66b-1896-497d-948c-9ee6783671e5" key="mcLastDateTime" objectStore="mcreyObjectStore" target="lastDateTime" targetValue="#[payload as String {format: &quot;yyyy-MM-dd'T'HH:mm:ssz&quot;}]">
+			<os:default-value ><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ssz"}]]]></os:default-value>
+		</os:retrieve>
+		<!-- <set-variable value="2023-06-01T00:00:00-05:00" doc:name="Set Variable" doc:id="64c23833-aed8-49bf-94a5-54cae99aa87d" variableName="lastDateTime"/> -->
+		<logger level="INFO" doc:name="lastDateTime" doc:id="e704cf35-7c26-4378-adc9-7946acc09877" message="lastDateTime: #[vars.lastDateTime]"/>
+		<set-variable value='#["McNaughton-McKay"]' doc:name="businessUnit" doc:id="68e0e69f-eb98-48fa-9e2a-86234769b9e5" variableName="businessUnit"/>
+		<set-variable value="#[p('pardot.businessId.mc')]" doc:name="businessUnitId" doc:id="51fcca68-96e8-4683-91e0-4825523322a1" variableName="businessUnitId"/>
+		<flow-ref doc:name="pardot-implementation" doc:id="0f5e5ded-906c-4c97-aa91-bb1193fdf1ca" name="pardot-implementation" />
+		<os:store doc:name="Store lastDateTime" doc:id="a896a083-b997-40a5-b6b8-c08206fa5506" key="mcLastDateTime" objectStore="mcreyObjectStore">
+			<os:value ><![CDATA[#[vars.currentDateTime]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="MC Job End" doc:id="95e1d719-5ffb-42c4-9ff7-bb9ade6e2b00" message="Job Completed for McNaughton-McKay"/>
+	
+</flow>
+	<flow name="reyFlow" doc:id="b1d5906e-75a9-4bb5-b59d-4d2a27015896" >
+		<scheduler doc:name="Scheduler" doc:id="a92f4de9-dfe3-4761-b8b2-b6b1b75bd3ba" >
+			<scheduling-strategy >
+				<cron expression="0 0 11 * * ? *" timeZone="America/New_York"/>
+			
+</scheduling-strategy>
+		</scheduler>
+		<!-- <http:listener doc:name="Listener" doc:id="aac077f8-d1ef-4277-91cb-2ee9d7c4cced" config-ref="api-httpListenerConfig" path="/rey"/> -->
+		<logger level="INFO" doc:name="Rey Job Start" doc:id="4fc75667-c16d-45a6-90f0-c6f1c9461759" message="Job Started for Reynolds Company" />
+		<set-variable value="#[(now() &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ssz&quot;}]" doc:name="currentDateTime" doc:id="45392499-9096-4569-9439-984b3fc964ba" variableName="currentDateTime" />
+		<os:retrieve doc:name="Retrieve lastDateTime" doc:id="21458821-801e-4f84-8412-69d63de3b7b8" key="reyLastDateTime" objectStore="mcreyObjectStore" target="lastDateTime" targetValue="#[payload as String {format: &quot;yyyy-MM-dd'T'HH:mm:ssz&quot;}]">
+			<os:default-value ><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<!-- <set-variable value="2023-10-04T01:00:08-05:00" doc:name="Set Variable" doc:id="35b19dae-86f0-4e3e-97f6-b3d9f51b2de7" variableName="lastDateTime"/> -->
+		<logger level="INFO" doc:name="lastDateTime" doc:id="342fd96a-dd89-4acf-969f-70f891fe5959" message="lastDateTime: #[vars.lastDateTime]" />
+		<set-variable value='#["The Reynolds Company"]' doc:name="businessUnit" doc:id="ccedbfb0-460e-43ea-a12e-e293e42182c3" variableName="businessUnit"/>
+		<set-variable value="#[p('pardot.businessId.rey')]" doc:name="businessUnitId" doc:id="2ccb5b4e-aef1-413e-a260-d7592ecb567f" variableName="businessUnitId" />
+		<flow-ref doc:name="pardot-implementation" doc:id="b1a1dad0-ebe9-4aa1-aa1a-8d8007917fe7" name="pardot-implementation" />
+		<os:store doc:name="Store lastDateTime" doc:id="d49a0e2b-9f2c-4cbc-bf73-e7334d13f4b9" key="reyLastDateTime" objectStore="mcreyObjectStore">
+			<os:value ><![CDATA[#[vars.currentDateTime]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Rey Job End" doc:id="d84c5bc8-8201-471a-a466-f2ac0033dc4e" message="Job Completed for Reynolds Company"/>
+	
+</flow>
+	<flow name="pardot-implementation" doc:id="a51c263f-9802-42af-9c90-01d478580b11" >
+		<flow-ref doc:name="tokenSub_Flow" doc:id="d3f413a9-086c-46cf-9af3-04af297a48d4" name="tokenSub_Flow" target="token"/>
+		<set-variable value="#[[]]" doc:name="pardotData" doc:id="ac41c72e-33e7-416f-9186-d4a091b96ff6" variableName="pardotData" />
+		<ee:transform doc:name="Pardot Call Payload" doc:id="84b9ebf5-0600-4a8f-80d0-31493b27b45c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	pardotData: [],
+	token: vars.token,
+	lastDateTime: vars.lastDateTime,
+	currentDateTime: vars.currentDateTime,
+	nextPageToken: "",
+	businessUnitId: vars.businessUnitId
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<vm:publish doc:name="recursiveCall" doc:id="18fa066f-3933-4119-9541-429f2d06aff4" config-ref="VM_Config" queueName="recursiveCall"/>
+		<vm:consume doc:name="finalData" doc:id="8ecad443-7d1a-4f9d-a779-a4d992af5cd4" config-ref="VM_Config" queueName="finalData" timeout="10" timeoutUnit="MINUTES"/>
+		<logger level="INFO" doc:name="Pardot Response" doc:id="4d9d6ca4-ee06-444c-a487-ba995b4fa6a9" message="Received Pardot response" />
+		<scatter-gather doc:name="Scatter-Gather" doc:id="b03383ed-fac2-4a86-af6c-25d2b1dba216" maxConcurrency="2">
+			<route>
+				<ee:transform doc:name="Lead" doc:id="07bd4a91-7d10-4648-b099-7e1c5ec18453">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.pardotData filter (!isEmpty($.salesforceLeadId)) default []]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Lead Data" doc:id="59be690f-5fad-494b-bba3-1ac70ebe6013" message="Lead Data" />
+				<choice doc:name="Choice" doc:id="d77a82cb-8fb7-4181-a102-44d36ef48664">
+					<when expression="#[!isEmpty(payload)]">
+						<flow-ref doc:name="leadImplementation" doc:id="933b8cf6-5b23-47af-9df9-14cefffecd32" name="leadImplementation" />
+					</when>
+					<otherwise>
+						<logger level="INFO" doc:name="No Data" doc:id="91d2c33e-5229-487c-8fbd-ab05c0440955" message="No Lead data to be processed"/>
+					</otherwise>
+				</choice>
+			</route>
+			<route>
+				<ee:transform doc:name="Contact" doc:id="58681819-cddd-4014-9725-009d1ed6b94d">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.pardotData filter (!isEmpty($.salesforceContactId)) default []]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Contact Data" doc:id="cbb39c7b-1c46-4797-84f1-44c5154a6802" message="Contact Data" />
+				<choice doc:name="Choice" doc:id="9a5aa91a-229a-42c5-99f2-00762421f948">
+					<when expression="#[!isEmpty(payload)]">
+						<flow-ref doc:name="contactImplementation" doc:id="7b25552a-01da-4a97-8938-f0f740eda8e3" name="contactImplementation" />
+					</when>
+					<otherwise>
+						<logger level="INFO" doc:name="No Data" doc:id="279ad36f-eace-434d-bbd7-04e29c29faff" message="No Contact Data to be processed"/>
+					</otherwise>
+				</choice>
+			</route>
+			<route>
+				<logger level="INFO" doc:name="Neither Lead nor Contact ID available" doc:id="17f55be0-6570-4f0f-b8a9-47b06428c58d" message="Neither Lead nor Contact ID available" />
+			</route>
+		</scatter-gather>
+	</flow>
+	<flow name="pardotCall" doc:id="17fd08d7-deda-4dae-9a3b-39c33c96cb79" >
+		<vm:listener doc:name="recursiveCall" doc:id="7839a800-b885-4b57-9761-e01d752e2bf8" config-ref="VM_Config" numberOfConsumers="1" queueName="recursiveCall"/>
+		<set-variable value="#[payload]" doc:name="originalPayload" doc:id="d3995b34-e84b-4a17-9dde-11af72fbb68e" variableName="originalPayload"/>
+		<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="2965555b-9708-42c1-a8e8-5e20834576d0" millisBetweenRetries="${sf.interval}">
+			<try doc:name="Try" doc:id="341c4a65-a062-40e3-8795-7d1f7911f89f">
+			<http:request method="GET" doc:name="Pardot Query" doc:id="e2adef47-8572-4175-96dd-8e9036e22a71" config-ref="Pardot_HTTP_Request_configuration" path="${pardot.queryPath}">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	Authorization : "Bearer " ++ payload.token,
+	"Pardot-Business-Unit-Id" : payload.businessUnitId
+}]]]></http:headers>
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"fields": "campaignId,comments,convertedAt,createdAt,firstActivityAt,firstReferrerUrl,firstReferrerQuery,firstReferrerType,grade,isEmailHardBounced,lastActivityAt,notes,score,salesforceUrl,convertedFromObjectName,convertedFromObjectType,campaignParameter,contentParameter,mediumParameter,sourceParameter,termParameter,salesforceLeadId,salesforceContactId",
+	("updatedAtAfter": payload.lastDateTime) if (isEmpty(payload.nextPageToken)),
+	("updatedAtBefore": payload.currentDateTime) if (isEmpty(payload.nextPageToken)),
+	("nextPageToken": payload.nextPageToken) if (!isEmpty(payload.nextPageToken))
+}]]]></http:query-params>
+		</http:request>
+				<error-handler>
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="6fab6886-4f59-4078-8035-a347c7074877" type="HTTP:CONNECTIVITY, HTTP:TIMEOUT">
+						<logger level="INFO" doc:name="Retry" doc:id="72151344-56aa-4e7c-a175-005577eff6a8" message="Retry for Connectivity Error" />
+					</on-error-propagate>
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="e862d232-d062-4572-bbc1-77e6f8c99bdf" >
+						<logger level="INFO" doc:name="Error Logger" doc:id="c54e0022-8ae0-4e1d-b5a8-250dddbb09e7" message='#["Error Details: " ++ error.muleMessgae.payload default error.detailedDescription]'/>
+					</on-error-continue>
+				</error-handler>
+		</try>
+		</until-successful>
+		<ee:transform doc:name="Accumulate Pardot Data" doc:id="96c960e3-b867-4c50-98ac-533bbc9cb1f1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	pardotData: vars.originalPayload.pardotData ++ (payload.values default []),
+	token: vars.originalPayload.token,
+	lastDateTime: "",
+	currentDateTime: "",
+	nextPageToken: payload.nextPageToken,
+	businessUnitId: vars.originalPayload.businessUnitId
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="a3e2369b-39c2-4ed4-b926-caeb1a8ffb04" >
+			<when expression="#[isEmpty(payload.nextPageToken)]" >
+				<vm:publish doc:name="finalData" doc:id="83e56ada-3460-461f-ad04-5d8f5f1ff1f0" config-ref="VM_Config" queueName="finalData"/>
+			</when>
+			<otherwise >
+				<vm:publish doc:name="recursiveCall" doc:id="90077a9e-8aab-41c4-9a5c-b18b6cb87204" config-ref="VM_Config" queueName="recursiveCall"/>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="leadImplementation" doc:id="6c3fbce0-f35d-49ea-b444-603f4e178743" >
+		<ee:transform doc:name="Lead Upsert" doc:id="cb634760-ad72-4227-babf-55ac98900701">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ((value,index)->{
+	Id: value.salesforceLeadId,
+	//pi__Needs_Score_Synced__c: value.needsscoresynced,
+	//pi__Pardot_Last_Scored_At__c: if(!isEmpty(value.lastscoredat)) ((value.lastscoredat replace " " with "T") as DateTime) else null,
+	pi__campaign__c: value.campaignId,
+	pi__comments__c: value.comments,
+	pi__conversion_date__c: if(!isEmpty(value.convertedAt)) ((value.convertedAt replace " " with "T") as DateTime) else null,
+	pi__conversion_object_name__c: value.convertedFromObjectName,
+	pi__conversion_object_type__c: value.convertedFromObjectType,
+	pi__created_date__c: if(!isEmpty(value.createdAt)) ((value.createdAt replace " " with "T") as DateTime) else null,
+	pi__first_activity__c: if(!isEmpty(value.firstActivityAt)) ((value.firstActivityAt replace " " with "T") as DateTime) else null,
+	pi__first_search_term__c: value.firstReferrerQuery,
+	pi__first_search_type__c: value.firstReferrerType,
+	pi__first_touch_url__c: value.firstReferrerUrl,
+	pi__grade__c: value.grade,
+	pi__last_activity__c: if(!isEmpty(value.lastActivityAt)) ((value.lastActivityAt replace " " with "T") as DateTime) else null,
+	pi__notes__c: value.notes,
+	pi__pardot_hard_bounced__c: value.isEmailHardBounced,
+	pi__score__c: value.score,
+	pi__url__c: value.salesforceUrl,
+	pi__utm_campaign__c: value.campaignParameter,
+	pi__utm_content__c: value.contentParameter,
+	pi__utm_medium__c: value.mediumParameter,
+	pi__utm_source__c: value.sourceParameter,
+	pi__utm_term__c: value.termParameter
+})]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+		<ee:transform doc:name="Lead CSV" doc:id="265b360e-08a3-47bb-9883-7701cfd9977f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header = true, separator = ',' 
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Lead Upsert Data" doc:id="68425d63-28be-45cd-982c-d9c58baf4b2a" message="Lead Upsert Data" />
+		<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="a6369930-ff7b-466a-8a6b-06d3c3daa83b" millisBetweenRetries="${sf.interval}">
+			<salesforce:create-job-bulk-api-v2 doc:name="Create Lead Upsert Job" doc:id="27c36e05-3db3-4a7c-b976-70e86990224c" config-ref="Salesforce_Config" objectType="Lead" operation="upsert" externalIdFieldName="Id"/>
+		</until-successful>
+		<logger level="INFO" doc:name="Lead Job Created" doc:id="94e8f105-a13d-4864-ac1a-447bd7a72a87" message="Lead Job Created"/>
+		
+		<set-variable value="#[payload.id]" doc:name="jobId" doc:id="04e09472-198b-49b2-beb8-994de7cefc9c" variableName="jobId" />
+		<logger level="INFO" doc:name="Lead Job Id" doc:id="b2be9464-3bf0-4f41-9d68-e5f7d7452a69" message="Lead Job Id: #[vars.jobId]" />
+		<flow-ref doc:name="jobComplete" doc:id="a007f483-3aa7-454c-b1d9-315dab536096" name="jobComplete" />
+</flow>
+	<flow name="contactImplementation" doc:id="1adf2f5c-9c04-45b4-af6f-0481fbf2d452" >
+			<set-variable value="#[[]]" doc:name="marketingProfilePayload" doc:id="2c74c0d4-1578-4823-b48e-228c9524e608" variableName="marketingProfilePayload"/>
+		<flow-ref doc:name="marketingProfileInput" doc:id="5a5649ce-ba88-4f04-a4df-89022a48dab1" name="marketingProfileInput"/>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="9ce4c1fc-1e4c-4121-8b27-298ea0cbb3ea" >
+			<route >
+				<ee:transform doc:name="Marketing Profile Upsert Data" doc:id="04ae73e3-0ed1-4d50-ab7b-d9cfe4cc0885" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.marketingProfilePayload filter (!isEmpty($.Id))]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<choice doc:name="Checking Input" doc:id="cdf79f5b-d14a-484f-8759-c4de2de1a808" >
+					<when expression="#[!isEmpty(payload)]">
+						<ee:transform doc:name="Marketing Profile CSV" doc:id="ace12629-abc7-4d79-8902-6724c1dca791">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/csv header = true, separator = ',' 
+---
+payload]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+						<logger level="INFO" doc:name="Marketing Profile Upsert Data" doc:id="77f5c719-ea4a-489f-8419-dcaf9bd90168" message="Marketing Profile Upsert Data" />
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="8a46d082-7385-4e59-b4f0-c1db39881c5f" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 objectType="Marketing_Profile__c" operation="upsert" doc:name="Create Marketing Profile Upsert Job" doc:id="7bd01121-a949-425b-ac97-90d89b50526d" config-ref="Salesforce_Config" externalIdFieldName="Id"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Marketing Profile Job Created" doc:id="4fbaa9e8-8e6b-4e27-aa57-b3606ec976cd" message="Marketing Profile Upsert Job Created" />
+						<set-variable value="#[payload.id]" doc:name="jobId" doc:id="9b201bd6-4eb5-41cf-8dea-55d38f0cb075" variableName="jobId" />
+						<logger level="INFO" doc:name="Job Id" doc:id="32a01d17-bfb2-4598-b803-56e7dfffc9cd" message="Marketing Profile Upsert Job Id: #[vars.jobId]" />
+						<flow-ref doc:name="jobComplete" doc:id="3995623a-1dc2-4dfb-8f98-9fde9715b5be" name="jobComplete" />
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="No Data for Upsert" doc:id="411b79f2-e1bd-4eda-a56e-807241e76746" message="No Data for Marketing Profile Upsert"/>
+					</otherwise>
+				</choice>
+			</route>
+			<route >
+				<ee:transform doc:name="Marketing Profile Insert Data" doc:id="3c3b2d82-67fb-4533-ab83-a24feb672456" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.marketingProfilePayload filter (isEmpty($.Id))]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<choice doc:name="Checking Input" doc:id="bc6194b5-eec5-442b-a1d7-ef53650eb460" >
+					<when expression="#[!isEmpty(payload)]">
+						<ee:transform doc:name="Marketing Profile Insert CSV" doc:id="a48dfaf1-f03d-46da-92e9-96a138f0e14c">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/csv header = true, separator = ',' 
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+						<logger level="INFO" doc:name="Marketing Profile Insert Data" doc:id="e276b43a-7679-45ad-8a73-9be8f12d7a2f" message="Marketing Profile Insert Data" />
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="492f220f-be5f-43d5-8036-cae2cb8f32f2" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 objectType="Marketing_Profile__c" operation="insert" doc:name="Create Marketing Profile Insert Job" doc:id="4eae9859-e808-4233-b410-8b6ffe786d7c" config-ref="Salesforce_Config"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Marketing Profile Insert Job Created" doc:id="771e4123-48a8-4da7-acd8-a53c0ae9d169" message="Marketing Profile Insert Job Created" />
+						<set-variable value="#[payload.id]" doc:name="jobId" doc:id="98dfe7d6-3a76-4772-8db7-068bc61d795a" variableName="jobId" />
+						<logger level="INFO" doc:name="Job Id" doc:id="58061e4d-e5fa-466d-a67a-ce9ad02470e6" message="Marketing Profile Create Job Id: #[vars.jobId]" />
+						<flow-ref doc:name="jobComplete" doc:id="40ad1a64-acab-4ecd-8f2f-edcb7cd2318c" name="jobComplete" />
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="No Data for Insert" doc:id="02df7589-e752-4e84-9bcb-044247f28d02" message="No Data for Marketing Profile Insert"/>
+					</otherwise>
+				</choice>
+			</route>
+		</scatter-gather>
+	</flow>
+	<sub-flow name="marketingProfileInput" doc:id="7b84be3f-6163-4a94-a246-3e1dcee4adf7" >
+		<foreach doc:name="For Each" doc:id="1244c0ea-9274-45aa-b61a-5ca7dac2d6cb" collection="#[payload]">
+			<set-variable value="#[payload]" doc:name="pardotData" doc:id="4a0dc805-d904-4e70-b5bf-0c17dd77ffcb" variableName="pardotData"/>
+			<try doc:name="Try" doc:id="b167af49-3704-4956-b487-4c5a93affd98" >
+				<salesforce:query doc:name="Query for Business Unit" doc:id="f797b005-97aa-414e-863c-5ab5a9902a58" config-ref="Salesforce_Config">
+								<salesforce:salesforce-query><![CDATA[SELECT Id,Business_Unit__c FROM Marketing_Profile__c WHERE Contact__r.Id= ':contactId']]></salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"contactId" : vars.pardotData.salesforceContactId
+}]]]></salesforce:parameters>
+							
+</salesforce:query>
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="bc4a713b-9eb0-4ed7-8c11-5222cc1c9766" >
+						<logger level="INFO" doc:name="Error Logger" doc:id="af7ed378-98d6-4bf4-9c66-6e10494d8b28" message="Error in Business Unit Lookup: #[error.detailedDescription]" />
+						<set-payload value="#[{error: true}]" doc:name="Set Error Payload" doc:id="0e8e651b-fa99-42dd-9ec8-d4337117d5eb" />
+					</on-error-continue>
+				</error-handler>
+			</try>
+			<choice doc:name="Checking Business Unit" doc:id="19b3ba7b-e4e9-4d3c-a7a0-9bbfb26c29aa">
+								<when expression="#[payload.error == true]">
+									<logger level="INFO" doc:name="Error Logger" doc:id="0f46c431-fab4-4bd4-81a5-96798bcf41f4" message="Error in Business Unit Lookup"/>
+								</when>
+				<when expression="#[payload.Business_Unit__c contains vars.businessUnit]">
+					<ee:transform doc:name="Marketing Profile Upsert" doc:id="93b55211-724e-41a5-8e1b-b1eb07bbf40b">
+										<ee:message>
+										</ee:message>
+						<ee:variables>
+							<ee:set-variable variableName="marketingProfilePayload"><![CDATA[%dw 2.0
+output application/json
+---
+vars.marketingProfilePayload << {
+	Id: (payload filter ($.Business_Unit__c == vars.businessUnit))[0].Id,
+	Contact__c: vars.pardotData.salesforceContactId,
+	Account_Engagement_Campaign__c: vars.pardotData.campaignId,
+	Account_Engagement_Comments__c: vars.pardotData.comments,
+	Account_Engagement_Conversion_Date__c: if(!isEmpty(vars.pardotData.convertedAt)) ((vars.pardotData.convertedAt replace " " with "T") as DateTime) else null,
+	Account_Engagement_Created_Date__c: if(!isEmpty(vars.pardotData.createdAt)) ((vars.pardotData.createdAt replace " " with "T") as DateTime) else null,
+	Account_Engagement_First_Activity__c: if(!isEmpty(vars.pardotData.firstActivityAt)) ((vars.pardotData.firstActivityAt replace " " with "T") as DateTime) else null,
+	Account_Engagement_First_Referrer__c: vars.pardotData.firstReferrerUrl,
+	Account_Engagement_First_Referrer_Query__c: vars.pardotData.firstReferrerQuery,
+	Account_Engagement_First_Referrer_Type__c: vars.pardotData.firstReferrerType,
+	Account_Engagement_Grade__c: vars.pardotData.grade,
+	Account_Engagement_Hard_Bounced__c: vars.pardotData.isEmailHardBounced,
+	Account_Engagement_Last_Activity__c: if(!isEmpty(vars.pardotData.lastActivityAt)) ((vars.pardotData.lastActivityAt replace " " with "T") as DateTime) else null,
+	//Account_Engagement_Last_Scored_At__c: if(!isEmpty(vars.pardotData.lastscoredat)) ((vars.pardotData.lastscoredat replace " " with "T") as DateTime) else null,
+	Account_Engagement_Notes__c: vars.pardotData.notes,
+	Account_Engagement_Score__c: vars.pardotData.score,
+	Account_Engagement_URL__c: vars.pardotData.salesforceUrl,
+	Conversion_Object_Name__c: vars.pardotData.convertedFromObjectName,
+	Conversion_Object_Type__c: vars.pardotData.convertedFromObjectType,
+	Google_Analytics_Campaign__c: vars.pardotData.campaignParameter,
+	Google_Analytics_Content__c: vars.pardotData.contentParameter,
+	Google_Analytics_Medium__c: vars.pardotData.mediumParameter,
+	Google_Analytics_Source__c: vars.pardotData.sourceParameter,
+	Google_Analytics_Term__c: vars.pardotData.termParameter,
+	//Needs_Score_Synced__c: vars.pardotData.needsscoresynced,
+	Business_Unit__c: vars.businessUnit
+}]]></ee:set-variable>
+						</ee:variables>
+									
+</ee:transform>
+				</when>
+				<otherwise>
+									<ee:transform doc:name="Marketing Profile Insert" doc:id="1416a4d7-8c89-41f4-bb95-d261b5e9bc33">
+										<ee:message>
+										</ee:message>
+						<ee:variables >
+							<ee:set-variable variableName="marketingProfilePayload" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.marketingProfilePayload << {
+	Contact__c: vars.pardotData.salesforceContactId,
+	Account_Engagement_Campaign__c: vars.pardotData.campaignId,
+	Account_Engagement_Comments__c: vars.pardotData.comments,
+	Account_Engagement_Conversion_Date__c: if(!isEmpty(vars.pardotData.convertedAt)) ((vars.pardotData.convertedAt replace " " with "T") as DateTime) else null,
+	Account_Engagement_Created_Date__c: if(!isEmpty(vars.pardotData.createdAt)) ((vars.pardotData.createdAt replace " " with "T") as DateTime) else null,
+	Account_Engagement_First_Activity__c: if(!isEmpty(vars.pardotData.firstActivityAt)) ((vars.pardotData.firstActivityAt replace " " with "T") as DateTime) else null,
+	Account_Engagement_First_Referrer__c: vars.pardotData.firstReferrerUrl,
+	Account_Engagement_First_Referrer_Query__c: vars.pardotData.firstReferrerQuery,
+	Account_Engagement_First_Referrer_Type__c: vars.pardotData.firstReferrerType,
+	Account_Engagement_Grade__c: vars.pardotData.grade,
+	Account_Engagement_Hard_Bounced__c: vars.pardotData.isEmailHardBounced,
+	Account_Engagement_Last_Activity__c: if(!isEmpty(vars.pardotData.lastActivityAt)) ((vars.pardotData.lastActivityAt replace " " with "T") as DateTime) else null,
+	//Account_Engagement_Last_Scored_At__c: if(!isEmpty(vars.pardotData.lastscoredat)) ((vars.pardotData.lastscoredat replace " " with "T") as DateTime) else null,
+	Account_Engagement_Notes__c: vars.pardotData.notes,
+	Account_Engagement_Score__c: vars.pardotData.score,
+	Account_Engagement_URL__c: vars.pardotData.salesforceUrl,
+	Conversion_Object_Name__c: vars.pardotData.convertedFromObjectName,
+	Conversion_Object_Type__c: vars.pardotData.convertedFromObjectType,
+	Google_Analytics_Campaign__c: vars.pardotData.campaignParameter,
+	Google_Analytics_Content__c: vars.pardotData.contentParameter,
+	Google_Analytics_Medium__c: vars.pardotData.mediumParameter,
+	Google_Analytics_Source__c: vars.pardotData.sourceParameter,
+	Google_Analytics_Term__c: vars.pardotData.termParameter,
+	//Needs_Score_Synced__c: vars.pardotData.needsscoresynced,
+	Business_Unit__c: vars.businessUnit,
+	OwnerId: p('pardot.ownerId')
+}]]></ee:set-variable>
+						</ee:variables>
+									
+</ee:transform>
+								</otherwise>
+							</choice>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="jobComplete" doc:id="2924ead7-3444-4671-bccb-e7972c54e19b" >
+		<until-successful maxRetries="1000" doc:name="Until Successful" doc:id="c4738737-8590-4293-a86c-a0b40abdea95" millisBetweenRetries="5000">
+			<salesforce:get-job-state-bulk-api-v2 doc:name="Get job state bulk api v 2" doc:id="5eb260c5-df9c-43e0-ac51-617696e0d79d" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+			<set-variable value="#[payload.state]" doc:name="jobState" doc:id="49db826d-2bad-40ce-b9ae-4c84963ba519" variableName="jobState" />
+			<logger level="INFO" doc:name="Job State" doc:id="77f12e44-abad-4748-a57b-ac56eeea5644" message='Job State: #[vars.jobState]' />
+			<choice doc:name="Check Job State" doc:id="86a1c8e5-ca3f-460b-80d1-24392eaf023b">
+			<when expression='#[vars.jobState == "JobComplete"]'>
+				<logger level="INFO" doc:name="Job Completed" doc:id="610aaeed-77a3-4ef8-b288-e3e9b51cfee0" message="Job Completed for #[vars.jobId]" />
+					<choice doc:name="Check Failed Records" doc:id="10888fe3-7799-46fd-a198-e8b554dd06e6">
+						<when expression="#[payload.numberRecordsFailed == 0]">
+							<salesforce:retrieve-job-successful-results-bulk-v2 doc:name="Retrieve job successful results bulk v 2" doc:id="8509547b-76d9-4386-9da4-bdd4e492a9ad" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+							<ee:transform doc:name="Successful Records" doc:id="844bc217-0bd5-4190-820c-20602a39f078">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+write({
+	"Successful Records": (payload map {
+		Id: $.id
+	})
+},"application/json")]]></ee:set-payload>
+						</ee:message>
+						<ee:variables>
+							<ee:set-variable variableName="subject"><![CDATA[%dw 2.0
+output application/json
+---
+"Successful Records for " ++ vars.businessUnit]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+							<logger level="INFO" doc:name="Successful Records" doc:id="f5e69f86-e076-42f6-9f0d-e957b2350c23" message="Successful Records for #[vars.businessUnit]: #[payload]" />
+						</when>
+						<otherwise >
+							<salesforce:retrieve-job-successful-results-bulk-v2 doc:name="Retrieve job successful results bulk v " doc:id="81119211-6a38-4973-a088-be6f422be6de" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+							<ee:transform doc:name="Successful Records" doc:id="93a88262-3950-443b-a424-3d771cd32c70" >
+								<ee:message >
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable variableName="successfulRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Successful Records": (payload map {
+		Id: $.id
+	})
+}]]></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+							<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v " doc:id="adafde06-14e2-4806-926b-f15be32f3913" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+							<ee:transform doc:name="Failed Records" doc:id="0df14049-69c7-47d7-a712-f4a16bf8e169" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+write(({
+	"Failed Records": (payload map {
+		Id: $.originalFields.Id,
+		errorMessage: $.errorMessage
+	})
+} ++ vars.successfulRecords),"application/json")]]></ee:set-payload>
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable variableName="subject" ><![CDATA[%dw 2.0
+output application/json
+---
+"Successful and Failed Records for " ++ vars.businessUnit]]></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+							<logger level="INFO" doc:name="Successful and Failed Records" doc:id="f6dbeb55-2be7-474d-9879-dc73829bc8d9" message="Successful and Failed Records for #[vars.businessUnit]: #[payload]"/>
+						</otherwise>
+					</choice>
+			
+</when>
+			<when expression='#[vars.jobState == "Failed"]'>
+				<logger level="INFO" doc:name="Job Failed" doc:id="8cd614fa-29e4-4059-b4ba-f323bedf0a75" message="Job Failed for #[vars.jobId]" />
+					<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v 2" doc:id="8158233d-376b-4e32-a711-e136928832f2" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+					<ee:transform doc:name="Failed Records" doc:id="18f60836-2803-4d3a-ab66-1407438af093">
+					<ee:message>
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+write({
+	"Failed Records": (payload map {
+		Id: $.originalFields.Id,
+		errorMessage: $.errorMessage
+	})
+}, "application/json")]]></ee:set-payload>
+					</ee:message>
+						<ee:variables >
+							<ee:set-variable variableName="subject" ><![CDATA[%dw 2.0
+output application/json
+---
+"Failed Records for " ++ vars.businessUnit]]></ee:set-variable>
+						</ee:variables>
+				</ee:transform>
+					<logger level="INFO" doc:name="Failed Records" doc:id="8a1ec9f1-6a3f-4892-9c70-2110cddbcfeb" message="Failed Records for #[vars.businessUnit]: #[payload]" />
+			
+</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Job Running" doc:id="30739f31-e0bc-40e8-aee2-2911d7d19fd1" message="Job Running" />
+					<raise-error doc:name="Job Running" doc:id="f814faa0-c440-46b7-afe1-17432621c538" type="BULK_JOB:RUNNING" description="Bulk API Job In Progress" />
+			</otherwise>
+		</choice>
+			<async doc:name="Async" doc:id="d442f268-8045-4fd4-bf67-dd2ce165056e" >
+				<email:send doc:name="Send Upsert Status" doc:id="6e5b3825-3e2f-43f1-b90b-2c864cf9ba04" config-ref="Outlook_SMTP" toAddresses="#[p('smtp.pardot.toAddress') splitBy ',']" fromAddress="${smtp.fromAddress}" subject="#[vars.subject]">
+				<email:body contentType="text/html">
+				</email:body>
+			</email:send>
+			</async>
+		
+</until-successful>
+	
+</sub-flow>
+	<sub-flow name="tokenSub_Flow" doc:id="b28e13ba-fbaf-4406-b23b-1f83952c078a" >
+		<http:request method="POST" doc:name="Token Request" doc:id="0d2ad995-d1b4-49ae-8566-c1b986125a7e" config-ref="SFDC_HTTP_Request_configuration" path="${sf.tokenPath}" >
+			<http:body ><![CDATA[#[%dw 2.0
+output application/x-www-form-urlencoded
+---
+{
+	grant_type: "password",
+	client_id: p('pardot.client_id'),
+	client_secret: p('secure::pardot.client_secret'),
+	username: p('sf.username'),
+	password: p('secure::sf.password') ++ p('secure::sf.token')
+}]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/x-www-form-urlencoded"
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Token" doc:id="861ecfbf-7dbd-4d56-9660-5e32da4ec643" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.access_token]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	
+</mule>

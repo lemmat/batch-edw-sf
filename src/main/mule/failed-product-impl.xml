@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	
+	<flow name="failed-product-orderline-logic" doc:id="75fe3174-9386-4bfe-91ed-0ef040b81427" >
+		<scheduler doc:name="Scheduler" doc:id="17f2568f-62e8-4951-bac9-f65d81c057b3" >
+			<scheduling-strategy >
+				<cron expression="0 15 0/3 1/1 * ? *" />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="6e2a28f5-2247-49d0-82ac-2e6b6905b2b3" message="failed-product-orderline-logic triggered"/>
+		<set-variable value="reprocess-products-orderlines" doc:name="Set job Variable" doc:id="1f1645b4-4fc6-44c9-9223-95879f65ec87" variableName="job" />
+		<os:retrieve doc:name="Retrieve orderlinesfailed" doc:id="92aad50d-86c7-4577-acfd-665158add057" key="orderlinesfailed" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[false]" doc:name="Set trigger Variable" doc:id="77621a59-01b2-4435-9850-1f9afe82e9d2" variableName="trigger"/>
+		<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="e1016a80-3324-460f-b060-34072c269b67" objectStore="CreateProductobjectStore"/>
+		<choice doc:name="Choice" doc:id="55b8821b-1e20-44e3-95bf-6b5695188911" >
+			<when expression="#[isEmpty(payload)]">
+				<logger level="INFO" doc:name="Trigger Next Flow" doc:id="40aa72e7-228f-432c-92c0-99b67ddb5af2" message="No records to  process in retry" />
+			</when>
+			<otherwise >
+				<foreach doc:name="For Each" doc:id="fcdc5548-db83-4a46-bb3a-91ff5643979f" collection="#[payload default []]">
+			<set-variable value="#[payload]" doc:name="Set jobId Variable" doc:id="d46ba917-7e08-4596-9191-05167c12ec40" variableName="jobId" />
+			<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v 2" doc:id="0d9a1317-ac92-4942-8d00-48d996d117a5" config-ref="Salesforce_Config" id="#[payload]" />
+			<ee:transform doc:name="payload" doc:id="885e39eb-dd23-414c-ab64-2426c6b72dc7">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+var result = (payload filter ((item, index) -> item."errorMessage" contains "Product2"))
+var finalResult = (result.originalFields."Product2.External_ID__c")
+output application/json
+---
+finalResult distinctBy ((item, index) -> item) default []]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+					<choice doc:name="Choice" doc:id="c31a65ca-0c55-4787-b691-9e55e602dfd1">
+				<when expression="#[isEmpty(payload)]">
+					<os:remove doc:name="Remove" doc:id="e4f853f9-d120-4bd6-89ea-e9f87b7b0782" key="#[vars.jobId]" objectStore="CreateProductobjectStore" />
+					<logger level="INFO" doc:name="Logger" doc:id="e4486e4b-d225-440a-895f-c80b0afeb23c" message="No product failure to reprocess for jobId:  #[vars.jobId]" />
+				</when>
+				<otherwise>
+					<logger level="INFO" doc:name="Logger" doc:id="94f779ce-4ca6-4f76-a690-66b3dbd2aef0" message="Product failure to reprocess for jobId:  #[vars.jobId]"/>
+							<flow-ref doc:name="failed-product-orderline-batch-job Reference" doc:id="c532987f-2b25-457c-9817-809cc508d6a7" name="failed-product-orderline-batch-job" />
+							<set-variable value="#[true]" doc:name="Set trigger Variable" doc:id="8509d964-4493-477e-bb31-daefae317ed3" variableName="trigger"/>
+				</otherwise>
+			</choice>
+		</foreach>
+				<try doc:name="Try" doc:id="d300e950-b32a-41c8-b325-bb24d0c4b989" >
+					<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="2b8861f0-4680-41b4-b49a-51f427e09c88" millisBetweenRetries="5000">
+					<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="d20f08ee-859d-4f8b-9eb8-7b4bbd15d8d8" objectStore="CreateProductobjectStore" />
+					<choice doc:name="Choice" doc:id="6aa7861b-c2fe-4c11-af4c-8ba8938f6d11">
+					<when expression="#[isEmpty(payload)]">
+							<logger level="INFO" doc:name="Logger" doc:id="007e94e3-f632-4e91-94f7-c7e9b54cafd5" message="All error records processed" />
+						</when>
+					<otherwise>
+						<raise-error doc:name="Raise error" doc:id="216864bd-dddf-4ac6-bb6d-904c18226ef9" type="RETRY:ERROR" description="Retry is in progress for failed Products in orderline" />
+					</otherwise>
+				</choice>
+				</until-successful>
+					<error-handler >
+						<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="df9163bd-ba09-4c83-96e6-c9cdd20a0439" >
+							<logger level="ERROR" doc:name="Logger" doc:id="ab545bbd-eb51-4cc6-9b55-3bfd18c2a865" message="Error Checking the status of job of product retry for orderlines, Ignore and continue , Error: #[error.description]"/>
+							<set-variable value="#[false]" doc:name="Set Variable" doc:id="479263ec-8c5c-46f5-bad9-184fd3ff5c25" variableName="trigger"/>
+						</on-error-continue>
+					</error-handler>
+				</try>
+				<choice doc:name="Choice" doc:id="17473ebd-c50e-4989-9756-bd6d682ca243" >
+					<when expression="#[vars.trigger]">
+						<os:store doc:name="Store orderlines timestamp" doc:id="20653002-89ac-4807-9d6c-87a36d357876" key="orderlinesfailed" objectStore="LastTimeStampObjectStore">
+							<os:value ><![CDATA[#[vars.lastUpdateDate default (now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+						</os:store>
+						<logger level="INFO" doc:name="Logger" doc:id="66c48456-531e-4691-bf41-00bf87173873" message="Trigger to Reprocess the failed orderLines Flow"/>
+						<async doc:name="Async" doc:id="0a8c159c-a6cf-450d-9199-283edcc2547a" >
+							<set-variable value="http" doc:name="Set scheme Variable" doc:id="5e710b99-d653-4b6c-87d9-9561eebf3c4f" variableName="scheme" />
+							<flow-ref doc:name="orderLine Reference" doc:id="1d29e4ac-463d-48b2-81b1-355109235ff2" name="orderlines-failed-pricebook" />
+						</async>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Logger" doc:id="e9a57276-da88-4a31-94fe-a90542b5c697" message="No records to process the failure products"/>
+					</otherwise>
+				</choice>
+			</otherwise>
+		</choice>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="failed-product-orderline-batch-job" doc:id="7af95808-3e86-4d65-bb32-3f61ba4afdbd" >
+		<batch:job jobName="failed-product-orderline-batch-job" doc:id="d935cd98-167b-4d07-823d-6bbdf244a0c3" maxFailedRecords="-1" blockSize="${batch.product.blocksize}" maxConcurrency="${batch.product.concurrency}" jobInstanceId='#["failed-product-orderline" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records>
+				<batch:step name="create-product" doc:id="de5525c3-ccf2-412e-bff6-34213bee6e37">
+					<ee:transform doc:name="payload" doc:id="9eab7fc8-c825-47c2-a599-778adde4950d">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"External_ID__c": payload replace /['\r\n|"']/ with "",
+	"Name": payload replace /['\r\n|"']/ with "",
+	"IsActive": true
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="669e10c2-0c90-4855-8b4c-2d7d0c256f1a" size="${batch.product.batch}">
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="84b61c0d-40da-4c19-a50e-69fbf6e6e364" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 operation="upsert" doc:name="Create job bulk api v 2" doc:id="f940ca48-74d5-471b-8495-b5a785016a9d" config-ref="Salesforce_Config" columnDelimiter="CARET" objectType="Product2" externalIdFieldName="External_ID__c">
+								<salesforce:s-objects><![CDATA[#[%dw 2.0
+output application/csv separator='^'
+---
+payload]]]></salesforce:s-objects>
+							</salesforce:create-job-bulk-api-v2>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="3ea05dbe-6c0f-40fb-9a1f-b1a32c506840" message="Product UpsertResponse: #[output application/json indent=false --- payload]" />
+						<os:store doc:name="jobId" doc:id="d60e9e93-f51d-4053-adec-c7a486ae682d" key="#[vars.job]" objectStore="CommonbjectStore">
+							<os:value><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="8d451218-c6e2-45f4-9c08-ec9e688c1371" name="check-status" />
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="price-update" doc:id="5528c338-715a-4519-95a1-bd4fc6a80c7a">
+					<ee:transform doc:name="payload" doc:id="6539943c-6a5a-45a0-8a2c-e4a044b5cee2">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"Product2.External_ID__c":payload."Name",
+	"IsActive": true,
+	"UnitPrice": 0,
+	"Pricebook2Id": p('pricebook.standard'),
+	"UseStandardPrice": false
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="76d31dd1-6866-47c7-9dab-99da2297ba77" size="${batch.product.batch}">
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="8380239c-14bf-4cfa-a20c-16a4783ef8eb" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 objectType="PricebookEntry" operation="insert" doc:name="Create job bulk api v 2" doc:id="c1ae178f-31ec-4cd1-8f42-4e2d391a1908" config-ref="Salesforce_Config" columnDelimiter="CARET" externalIdFieldName="Id">
+								<salesforce:s-objects><![CDATA[#[%dw 2.0
+output application/csv separator='^'
+---
+payload]]]></salesforce:s-objects>
+							</salesforce:create-job-bulk-api-v2>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="1e4cad43-f1cc-455b-a1f9-46feef757da5" message="Product UpsertResponse: #[output application/json indent=false --- payload]" />
+						<os:store doc:name="jobId" doc:id="23c86f91-8bc8-428f-862e-b715b9b6c3b8" key="#[vars.job]" objectStore="CommonbjectStore">
+							<os:value><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="8b8fcbf1-ff0a-4dc2-af90-0eecf5895222" name="check-status" />
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="failed-products" doc:id="6945f995-1180-40b0-887b-9eee6e680179" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="b43b9997-b11a-40f1-a68b-7c285b4c80fe" size="${batch.product.batch}">
+						<ee:transform doc:name="product" doc:id="39e09453-5b2c-48d9-83a1-e07e31d6b4fc">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "ProductRetry for orderline records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "ProductRetry  for orderline records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables>
+								<ee:set-variable resource="dw/product-retry-upert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="dd86eff5-6377-47b2-98dc-18c6068ba3a5" name="smtp-attachment-sub-flow" />
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="528ded01-669f-4332-92af-f00cfc973f65">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="3faf8849-401f-41b5-b3a5-1e06fb98c1cd" message="Product failure to reprocess for jobId:  #[vars.jobId] , result:#[payload]" />
+				<try doc:name="Try" doc:id="0b22f54b-deb0-4382-a2c9-042914104889" >
+					<os:remove doc:name="Remove" doc:id="ffcd5a84-ce97-46e8-b66a-036810f45c8a" key="#[vars.jobId]" objectStore="CreateProductobjectStore" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="cb123eb5-4e34-4bfb-acc2-8740116724ae" >
+							<logger level="INFO" doc:name="Logger" doc:id="9b151acd-40b5-4858-915a-cec2477202fc" message="Unable to delete the key: #[vars.jobId]"/>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+	<flow name="failed-product-quoteline-logic" doc:id="cfd17bfb-3890-40c8-a9d3-bea9dd327d2d" >
+		<scheduler doc:name="Scheduler" doc:id="4e6f0544-31de-453e-ae93-49f1ea6b4cd2" >
+			<scheduling-strategy >
+				<cron expression="0 45 0/3 1/1 * ? *" />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="db5d444b-60df-4499-9f89-9c2ccad7f4b3" message="failed-product-quoteline-logic triggered"/>
+		<set-variable value="reprocess-products-quotelines" doc:name="Set job Variable" doc:id="510a5c4b-9301-41ef-a089-cc21f238a033" variableName="job" />
+		<set-variable value="#[(now() &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set lastUpdateDate Variable" doc:id="9f6efe8e-2731-42ad-8f26-41a6dee98dce" variableName="lastUpdateDate"/>
+		<set-variable value="#[false]" doc:name="Set trigger Variable" doc:id="e578c8f9-5867-410f-8678-60698ee856f1" variableName="trigger"/>
+		<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="b0d17a0c-ab76-47ca-8d8a-e78788aebc40" objectStore="CreateProductQuoteobjectStore"/>
+		<choice doc:name="Choice" doc:id="0746a5dd-4023-4715-9d38-31d6385b0c51" >
+			<when expression="#[isEmpty(payload)]">
+				<logger level="INFO" doc:name="Trigger Next Flow" doc:id="1a2cbc5e-89a3-4ecc-a134-6deb6900fffd" message="No records to  process in retry" />
+			</when>
+			<otherwise >
+				<foreach doc:name="For Each" doc:id="e6a8b016-059b-4e3c-b8a4-1d5435968e2e" collection="#[payload default []]">
+			<set-variable value="#[payload]" doc:name="Set jobId Variable" doc:id="9d7cef71-f311-454a-bf25-e6edfcca0ab4" variableName="jobId" />
+			<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v 2" doc:id="ffb480c5-d668-4fbd-bb24-007d2cf762d9" config-ref="Salesforce_Config" id="#[payload]" />
+			<ee:transform doc:name="payload" doc:id="9927d81c-e429-48b8-8e5b-e3b4715f1529">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+var result = (payload filter ((item, index) -> item."errorMessage" contains "Product2"))
+var finalResult = (result.originalFields."Product__r.External_ID__c")
+output application/json
+---
+finalResult distinctBy ((item, index) -> item) default []]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+					<choice doc:name="Choice" doc:id="987e191b-ffde-4e05-b418-4d733e25c6b9">
+				<when expression="#[isEmpty(payload)]">
+					<os:remove doc:name="Remove" doc:id="a1bf1921-9393-4a9b-a4f1-62c731006fa4" key="#[vars.jobId]" objectStore="CreateProductQuoteobjectStore" />
+					<logger level="INFO" doc:name="Logger" doc:id="4079ce0e-0923-4d06-914e-446d5a58c263" message="No product failure in quotelines to reprocess for jobId:  #[vars.jobId]" />
+				</when>
+				<otherwise>
+					<logger level="INFO" doc:name="Logger" doc:id="ff90ab40-dc96-4304-8f63-51ad1afa2c73" message="Product failure in quotelines to reprocess for jobId:  #[vars.jobId]"/>
+							<flow-ref doc:name="failed-product-quoteline-batch-job Reference" doc:id="a39ff967-d25a-4b0a-bcac-950aca0cce7a" name="failed-product-quoteline-batch-job" />
+							<set-variable value="#[true]" doc:name="Set trigger Variable" doc:id="22416bdc-5c5a-4fda-9dbd-53c352d72190" variableName="trigger"/>
+				</otherwise>
+			</choice>
+		</foreach>
+				<try doc:name="Try" doc:id="2b3189b1-0665-4692-b812-ee37861ea242" >
+					<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="e7a7ff75-cdc0-47cb-b1f6-0fbcdcd5ab82" millisBetweenRetries="5000">
+					<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="b89e1ced-44d8-4697-a982-c39787bff07e" objectStore="CreateProductQuoteobjectStore" />
+					<choice doc:name="Choice" doc:id="0f89d165-0a8b-462c-8758-11621b8842e6">
+					<when expression="#[isEmpty(payload)]">
+							<logger level="INFO" doc:name="Logger" doc:id="66ff0266-ddd6-4d6b-b02d-5b5314568328" message="All error records processed for quotelines" />
+						</when>
+					<otherwise>
+						<raise-error doc:name="Raise error" doc:id="b859942c-ce4c-4a97-81ff-b1fb99e3d732" type="RETRY:ERROR" description="Retry is in progress for failed Products in orderline" />
+					</otherwise>
+				</choice>
+				</until-successful>
+					<error-handler >
+						<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="0775a50a-4588-4071-a214-b16198573143" >
+							<logger level="ERROR" doc:name="Logger" doc:id="00b1bf07-bf9d-49cb-b405-d2133c91a169" message="Error Checking the status of job of product retry for quotelines, Ignore and continue , Error: #[error.description]"/>
+							<set-variable value="#[false]" doc:name="Set Variable" doc:id="893fe168-eb5c-463c-b21a-33c6d1a66679" variableName="trigger"/>
+						</on-error-continue>
+					</error-handler>
+				</try>
+				<choice doc:name="Choice" doc:id="9fa655d8-cc32-4f34-a65f-b6eb722cd58b" >
+					<when expression="#[vars.trigger]">
+						<os:store doc:name="Store orderlines timestamp" doc:id="169d557d-7fc4-426e-9be0-8899f6996342" key="quotelines" objectStore="LastTimeStampObjectStore">
+							<os:value ><![CDATA[#[vars.lastUpdateDate default (now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+						</os:store>
+						<logger level="INFO" doc:name="Logger" doc:id="07f8dee9-68f4-4f4e-9b13-f34e1c8b02f8" message="Trigger to Reprocess the failed quotelines Flow"/>
+						<async doc:name="Async" doc:id="6f9d9138-b4c4-49dc-ae00-7e369d4af6cc" >
+							<set-variable value="http" doc:name="Set scheme Variable" doc:id="eade06ef-3833-4982-8093-fd7b5c8d614a" variableName="scheme" />
+							<flow-ref doc:name="quotelines Reference" doc:id="2dfb8ed8-d654-412c-9907-9d35b78f726e" name="quotelines" />
+						</async>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Logger" doc:id="b93340ea-8d91-4839-9303-cc29307f5fd7" message="No records to process the failure products"/>
+					</otherwise>
+				</choice>
+			</otherwise>
+		</choice>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="failed-product-quoteline-batch-job" doc:id="d3129c78-d19f-4ee9-8844-0f47894c700d" >
+		<batch:job jobName="failed-product-quoteline-batch-job" doc:id="c9971092-435d-473f-9b46-013c11f6b158" maxFailedRecords="-1" blockSize="${batch.product.blocksize}" maxConcurrency="${batch.product.concurrency}" jobInstanceId='#["failed-product-quoteline" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records>
+				<batch:step name="create-product" doc:id="4d3c753f-cefc-4e21-81a2-a3fb2823a5eb">
+					<ee:transform doc:name="payload" doc:id="c0768356-062e-4ffd-98c8-51b50b384e91">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"External_ID__c": payload replace /['\r\n|"']/ with "",
+	"Name": payload replace /['\r\n|"']/ with "",
+	"IsActive": true
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="a75ef7d5-f509-435a-9cec-3055fd847736" size="${batch.product.batch}">
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="75e27e5e-f4f8-4f70-9392-8547b2ab717f" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 operation="upsert" doc:name="Create job bulk api v 2" doc:id="045868cf-c1f9-4ad5-844f-fcde66941e42" config-ref="Salesforce_Config" columnDelimiter="CARET" objectType="Product2" externalIdFieldName="External_ID__c">
+								<salesforce:s-objects><![CDATA[#[%dw 2.0
+output application/csv separator='^'
+---
+payload]]]></salesforce:s-objects>
+							</salesforce:create-job-bulk-api-v2>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="02a5c221-76ab-4cd2-ae3c-021e06cf9832" message="Product UpsertResponse: #[output application/json indent=false --- payload]" />
+						<os:store doc:name="jobId" doc:id="9e277d91-2922-4942-a946-3c51fe974803" key="#[vars.job]" objectStore="CommonbjectStore">
+							<os:value><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="7fc709fe-3105-4b6e-a7de-f32dfd565dda" name="check-status" />
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="price-update" doc:id="87de8966-e694-458f-b2e1-6747f2d049a6">
+					<ee:transform doc:name="payload" doc:id="84943229-4a8e-4467-b2f1-22c871e6ed83">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"Product2.External_ID__c":payload."Name",
+	"IsActive": true,
+	"UnitPrice": 0,
+	"Pricebook2Id": p('pricebook.standard'),
+	"UseStandardPrice": false
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="668334e4-d70a-452e-83ed-fdf265534f8e" size="${batch.product.batch}">
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="baeacf9c-9e0f-4b61-bbdb-ab162828b631" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 objectType="PricebookEntry" operation="insert" doc:name="Create job bulk api v 2" doc:id="a56a7963-8e36-4fdc-8443-e04282e00222" config-ref="Salesforce_Config" columnDelimiter="CARET" externalIdFieldName="Id">
+								<salesforce:s-objects><![CDATA[#[%dw 2.0
+output application/csv separator='^'
+---
+payload]]]></salesforce:s-objects>
+							</salesforce:create-job-bulk-api-v2>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="c5a89063-aa30-4384-9980-2f2033b4a7b7" message="Product UpsertResponse: #[output application/json indent=false --- payload]" />
+						<os:store doc:name="jobId" doc:id="3fecc7a3-75cd-4158-86d8-154e00153213" key="#[vars.job]" objectStore="CommonbjectStore">
+							<os:value><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="f29ed515-ba89-466d-8a58-55765783555b" name="check-status" />
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="failed-products" doc:id="497443ad-312b-4845-8d66-8d616942c4a6" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="e215e2ce-d4fe-4f3d-bd1b-cc5181ec6afe" size="${batch.product.batch}">
+						<ee:transform doc:name="product" doc:id="faa57a4d-5b86-4ae8-b92e-0b1246c9c236">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "ProductRetry for orderline records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "ProductRetry  for orderline records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables>
+								<ee:set-variable resource="dw/product-retry-upert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="2dd7f5f8-0e0f-4cc9-bac2-4af15f48727f" name="smtp-attachment-sub-flow" />
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="99517273-5c99-4c06-a7af-552c55579897">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="a7d67273-4b30-4fb5-9b75-f00618d4b6fa" message="Product failure to reprocess for jobId:  #[vars.jobId] , result:#[payload]" />
+				<try doc:name="Try" doc:id="2c7c9e40-eae1-4630-8897-d400adc27951" >
+					<os:remove doc:name="Remove" doc:id="6352897a-bf24-4bda-8167-1559965596b6" key="#[vars.jobId]" objectStore="CreateProductQuoteobjectStore" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="17332569-4dae-483f-b725-7aa5cbf6e63e" >
+							<logger level="INFO" doc:name="Logger" doc:id="8b2ff500-6511-4b2e-83ea-a3ddd9b8fb01" message="Unable to delete the key: #[vars.jobId]"/>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+</mule>

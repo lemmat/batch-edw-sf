@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+<flow name="shipment" doc:id="b13a0ef2-a00c-41e9-a297-33da36d28acf">
+		<!-- <scheduler doc:name="14_Scheduler" doc:id="c99f53a8-bd68-4f5c-b807-8a6b41a81122" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger" doc:id="5f8c02ac-babd-473a-9ed5-114ae5cf3b58" message="Job Triggered for shipment"/>
+		<set-variable value="shipment" doc:name="Set job Variable" doc:id="300e9262-49b9-47a2-8087-9359c335d999" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="c82957ac-e85f-4195-8fe9-0a429a44c8ee" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve shipment" doc:id="f9eaa3ca-fb77-47f3-8ce0-9b6864316c3c" key="shipment" target="lastUpdateDate" objectStore="LastTimeStampObjectStore">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[p('sql.shipment')]" doc:name="Set  SqlStatement Variable" doc:id="59d46b61-8b7f-4b9f-8575-5907740c443e" variableName="sqlStatement"/>
+		<logger level="INFO" doc:name="Logger" doc:id="f04e527a-6bf7-4a88-af8e-2234917fc02e" message="shipment Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select shipment" doc:id="cb43af59-f00f-4d4d-9c36-facd3ac51557" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="fe1e4ea3-5cae-4d74-8fd7-871fd7900ca7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="shipment-batch-job" doc:id="070cdde7-f65d-49e1-b336-dedb427c39eb" maxFailedRecords="-1" blockSize="${batch.shipment.blocksize}" maxConcurrency="${batch.shipment.concurrency}" jobInstanceId='#["shipment-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="81035a41-272c-4c61-b7c1-507cc3455b67" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="4e85a77c-7ebc-4dcc-9cf2-537a15266128" size="${batch.shipment.batch}">
+						<ee:transform doc:name="Transform Message" doc:id="d9020c68-98f6-4f91-8044-7fbb0bc69a93" >
+							<ee:message >
+								<ee:set-payload resource="dw/shipment-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="719b71aa-08d8-4add-9d91-4c1d1438df37" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="ce0cb1f4-74f0-4d21-8475-47d49fd5a53c" config-ref="Salesforce_Config" objectType="Shipment__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="0633d5b1-1bae-47bf-9477-7e85dff877ef" message="Shipment UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="142fbed3-68a9-4823-a61e-c9ade0f938bc" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="2387ef3f-da91-42d6-a994-4a0873b7f509" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="9337f07f-ef87-4e3c-aea2-17dc25503431" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="83a4d2c6-3567-4c59-b6db-07bedb4b9af2" size="${batch.shipment.batch}">
+						<ee:transform doc:name="shipment" doc:id="3a668497-b568-47b5-9f9e-2fca7e8db7ff" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "Shipment records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "Shipment records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/shipment-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="a1ec42aa-7712-4281-ac09-be5a10c7e099" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="516fccfc-2d20-4a57-acb1-11f5335b4ec4" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="73e6d6ae-d3f3-4170-9f38-acd3765e0334" key="shipment" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="816ed45b-ec4b-486b-abbc-75ba276c0fce" message="Job End for Shipment : #[payload]"/>
+				<choice doc:name="Choice" doc:id="563a159d-1e12-47c9-9645-9d1dfcb9d51a">
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="6b5beed5-89e0-4173-a7e6-dde73c564ec5" message="Manual Trigger completed" />
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="cf46a2b3-19ae-4570-b5a8-4083481a5228" >
+							<flow-ref doc:name="shipmentlines Reference" doc:id="58966248-1b65-4b0d-9542-222169ac8025" name="shipmentlines" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="shipmentlines" doc:id="0979d7de-242c-4f4a-a129-6bac63f965da">
+		<logger level="INFO" doc:name="Logger" doc:id="facb8a1f-f911-4a2f-9a70-64b61b76a595" message="Job Triggered for shipmentlines"/>
+		<set-variable value="shipmentlines" doc:name="Set job Variable" doc:id="be270079-02ad-4154-937f-9e0853f2ed38" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="77832c41-fe71-4b8a-b7e7-6fdbc2c4d5b6" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve shipmentlines" doc:id="50cca284-4b5f-46f4-a17b-68e66b54c05a" key="shipmentlines" target="lastUpdateDate" objectStore="LastTimeStampObjectStore">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[p('sql.shipmentlines')]" doc:name="Set  SqlStatement Variable" doc:id="d89e9174-1dfa-4a29-93e8-c073ad9ff36d" variableName="sqlStatement"/>
+		<logger level="INFO" doc:name="Logger" doc:id="a01e9b06-8828-4951-a310-7581ca723a04" message="shipmentlines Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select shipmentlines" doc:id="ca14bb38-5f9d-4e51-87a4-d2cd6d6d56ec" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="1bf52f25-22e4-421e-b1d2-750c1d8b1a11" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="shipmentlines-batch-job" doc:id="bb6c9e54-903c-4e74-b73c-3b3aa50c98aa" maxFailedRecords="-1" blockSize="${batch.shipmentlines.blocksize}" maxConcurrency="${batch.shipmentlines.concurrency}" jobInstanceId='#["shipmentlines-" ++(now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="6219e5a5-414d-424a-b011-82f93c377216" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="4e164898-5ac7-478b-b2ff-e135528043b1" size="${batch.shipmentlines.batch}">
+						<ee:transform doc:name="Transform Message" doc:id="1b875415-c0a8-4399-b0e0-001ca469c2fb" >
+							<ee:message >
+								<ee:set-payload resource="dw/shipmentlines-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="d0451287-a54f-456b-baef-b882777b1274" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="469a7650-26cb-4805-8bdf-3197c3b3e87b" config-ref="Salesforce_Config" objectType="Shipment_Line_Item__c" operation="upsert" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="63ed5306-52ad-4ea5-9402-4870d0cdedd2" message="Shipmentlines UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="c127659c-b78e-4b0e-8195-3db8121b0582" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="99c50ef2-3565-4d91-87f4-152a159ba285" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="986e0c02-f185-42bb-a430-0f517aa66b04" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="a436fa55-d116-4755-907e-92c52ddd9fde" size="${batch.shipmentlines.batch}">
+						<ee:transform doc:name="shipmentlines" doc:id="1b617822-91a5-4d48-a983-0da669fd9fc8" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "Shipmentlines records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "Shipmentlines records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/shipmentlines-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="ff899866-9552-4b4b-8556-2aeb03f1d910" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="310f0e11-5963-4d85-9983-d4b9ab951d34" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="f8bdf39a-0b4e-40fe-92d5-70993b1d7b60" key="shipmentlines" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="99e53eac-a3e1-413c-bda2-67b620acc527" message="Job End for Shipmentlines : #[payload]"/>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+</mule>

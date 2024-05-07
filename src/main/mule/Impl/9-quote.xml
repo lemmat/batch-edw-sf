@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd">
+	<flow name="quote" doc:id="58e85a5f-9b72-4e10-bc8b-de9059cd4dc7">
+		<!-- <scheduler doc:name="12_Scheduler" doc:id="9ba9935e-9a57-4fd1-b614-68b614f6992d" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger" doc:id="00e4257d-041e-4177-b056-9bc1feba94a3" message="Job Triggered for Quote"/>
+		<set-variable value="quote" doc:name="Set job Variable" doc:id="08ee5f63-245e-4c78-a9da-2a343f9a9eb5" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="42a5ff43-dc2f-4a66-a861-1343c9ea79d8" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve quote" doc:id="9979acc6-c7c8-4c29-b5a4-b127e812b781" key="quote" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[p('sql.quote')]" doc:name="Set  SqlStatement Variable" doc:id="dd919800-a918-4a4a-9b80-53f45408777d" variableName="sqlStatement"/>
+		<logger level="INFO" doc:name="Logger" doc:id="e0555aa0-231d-41a4-9e1e-0d77ec1301cc" message="Quote Statement:  #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select Quote" doc:id="f6865e45-26cb-4192-91a2-b43fdabdac54" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="bd46c002-3cfd-49c8-972a-88908c979cfe" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="quote-batch-job" doc:id="7a648975-d3fb-422f-98fb-c0c0a61abbeb" maxFailedRecords="-1" blockSize="${batch.quote.blocksize}" maxConcurrency="${batch.quote.concurrency}" jobInstanceId='#["quote-" ++(now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="9a472a59-0070-4c87-a3c2-21b8885d42df" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="cd3f169d-2ee9-46bd-a5fa-f04abb6e2136" size="${batch.quote.batch}">
+						<ee:transform doc:name="payload" doc:id="cdb5ad9b-7094-432a-af9e-4e1f9ced3042" >
+							<ee:message >
+								<ee:set-payload resource="dw/quote-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="da4b6936-23fb-4458-bbf4-a6cabc8d56ed" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="1a644dd4-4107-480d-bf85-76948a366cd3" config-ref="Salesforce_Config" objectType="Quote__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="15556ab3-a231-4bbf-aa71-293adc675190" message="Quote UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="76f288f4-301a-461b-8a29-9f11b5033e2c" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="bc0e64d4-5b31-4c24-962f-de507484944c" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="2ddff0d5-d8c3-4a9e-8f08-88988c48b273" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="f80b1875-bee7-4346-b578-988cc87b7950" size="${batch.quote.batch}">
+						<ee:transform doc:name="quote" doc:id="50553d38-69a3-4c06-8513-6458057082b6" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "Quote records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "Quote records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/quote-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="23540968-6b7c-4158-8fc9-7c99ec8d62be" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="7ebfc9f0-6296-4fbd-89e5-3940c75baf43" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="14314ff1-2797-4434-9cd9-4225c987195f" key="quote" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="b3b413ed-4065-4377-b29e-95d322e32aec" message="Job End for Quote : #[payload]"/>
+				<choice doc:name="Choice" doc:id="cfab3753-f977-4bd7-b5b3-38c4f2f20478">
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="29867452-aabb-49b3-9458-133befdccb16" message="Manual Trigger completed" />
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="5276b132-d8ba-4a22-aa73-68f22393ca67" >
+							<flow-ref doc:name="quotelines Reference" doc:id="0414e656-32a6-4998-8a9b-b1fc0b180c48" name="quotelines" />
+						</async>
+					</otherwise>
+				</choice>
+				
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="quotelines" doc:id="39ff45a2-d863-4d27-a36c-5c9b2fb20cb7">
+		<logger level="INFO" doc:name="Logger" doc:id="182db232-b34e-412d-82d1-08d35c67917b" message="Job Triggered for QuoteLines"/>
+		<set-variable value="quotelines" doc:name="Set job Variable" doc:id="bc0955fe-7461-4c9a-944b-317f8807f1ad" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="edf6c8af-0cfc-446f-8657-9318e9e5c596" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve quotelines" doc:id="84f07897-43e4-4857-8267-eec7ddcd1d39" key="quotelines" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[p('sql.quotelines')]" doc:name="Set  SqlStatement Variable" doc:id="7657fb40-bf84-4a5d-8b0e-2a5cfe7ea1bc" variableName="sqlStatement"/>
+		<logger level="INFO" doc:name="Logger" doc:id="e79c4423-98a3-4602-8b7a-09ed45b91747" message="QuoteLines Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select QuoteLines" doc:id="f7538d38-6851-4be3-aaa3-0826a1057700" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="3545b9ec-1858-417e-b076-4e0e08bdc758" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="quotelines-batch-job" doc:id="2111d6bd-5bef-4f2b-a33b-76c75cf5364b" maxFailedRecords="-1" blockSize="${batch.quotelines.blocksize}" maxConcurrency="${batch.quotelines.concurrency}" jobInstanceId='#["quotelines-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="d522dcf1-b4dd-4afb-88c3-027957945ead" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="570c3f8b-1fae-4814-9282-3ea5f14d9ef3" size="${batch.quotelines.batch}">
+						<ee:transform doc:name="payload" doc:id="66582ae9-0b02-43bf-b574-6ef9efdae124" >
+							<ee:message >
+								<ee:set-payload resource="dw/quotelines-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="bda1d088-7542-42ed-8815-b29b9efed568" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="320ec860-2777-4f68-b25e-94fbfb63afb6" config-ref="Salesforce_Config" objectType="Quote_Line_Item__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="Quote_Line_Number__c" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="1e1ccfa6-4bca-4733-8c98-a61705f20eba" message="QuoteLines UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="f231ad3c-b5ce-4801-abed-a2175f3e5e8c" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status-quote-retry Reference" doc:id="ff83cc60-9579-485e-bd42-aa2857ef9286" name="check-status-quote-retry"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="b7cd775d-c7ac-41a3-a1c6-484b079c3801" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="f3eaf958-f1c0-418d-8063-4af4f63bbd73" size="${batch.quotelines.batch}">
+						<ee:transform doc:name="quotelines" doc:id="e34567bf-9dbb-471e-a8f6-105462466ed7" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "QuoteLines records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "QuoteLines records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/quotelines-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="bc6a0b7c-af46-460e-9ba8-7df0bd0e74a7" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="2ad8611d-3bae-4511-979d-d20495a0753e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="9b976766-6240-4e19-8b06-f266f49195ab" key="quotelines" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="8dc50d14-b6c4-4d2a-a9ca-ced1e4c6556a" message="Job End for QuoteLines : #[payload]"/>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	</mule>

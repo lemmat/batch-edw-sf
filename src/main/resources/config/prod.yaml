@@ -1,0 +1,169 @@
+api:
+  id: "18987175"
+https:
+  port: "8082"
+tls:
+  path: "certs/keystore.jks"
+batch:
+  customer: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  vendor: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  accountmanager: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  accountmanagerrelationship: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  saleswarehouse: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  saleswarehouserelationship: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  customernumber: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  shipto: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  spatask: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  product: 
+    concurrency: "1"
+    blocksize: "30000"
+    batch: "30000"
+  order: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  orderlines: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  quote: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  quotelines: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  invoice: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  invoicelines: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  shipment: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+  shipmentlines: 
+    concurrency: "1"
+    blocksize: "5000"
+    batch: "5000"
+smtp:
+  host: "63.238.73.203"
+  port: "25"
+  fromAddress: "relay@mc-mc.com"
+  toAddress: "Mulesoft-alert@mc-mc.com"
+  pardot:
+    toAddress: "webmaster@mc-mc.com,ecommerce@reynco.com,admehaffey@reynco.com,davidsoa@mc-mc.com"
+  opti:
+    send: "true"
+    fromAddress: "relay@mc-mc.com"
+    toAddress: "Mulesoft-alert@mc-mc.com"
+db:
+  host: "Mcrey-BI.mc-mc.com" 
+  port: "1433" 
+  user: "Salesforce_developer"
+  querytimeoutminutes: "10"
+sf:
+  username: "systemuser@mcrey.com"
+  url: "https://login.salesforce.com/services/Soap/u/54.0"
+  retry: "3"
+  interval: "5000"
+  host: "login.salesforce.com"
+  port: ""
+  tokenPath: "/services/oauth2/token"
+  connectionTimeout: "60"
+  loginRequestTimeout: "60"
+  ps:
+    username: "systemuser@mcrey.com"
+    url: "https://login.salesforce.com/services/Soap/u/54.0"
+    event: "/event/Credit_Application_PE__e"
+system:
+  mcmc:
+    host: "www.mc-mc.com"
+    port: "443"
+    path: "/api/mcmc/account/UpdateUserStatus"
+    responsetimeout: "120000"
+  retry:
+    count: "3"
+    interval: "10000"
+pardot:
+  host: "pi.pardot.com"
+  port: ""
+  queryPath: "/api/v5/objects/prospects"
+  client_id: "3MVG9ux34Ig8G5eqAyo7VwtnXmfrqMbollbiowhp3MgfX4U6Pm0ZTeyTVUMMg.cJmOgCufom3AENGPvpeenel"
+  ownerId: "005Dn000007wpim"
+  businessId:
+    mc: "0UvDn000000sY4oKAE"
+    rey: "0UvDn000000sY4tKAE"
+record:
+  "vendor": "012Dn000001nWUFIA2"
+  "customer": "012Dn000001nWUDIA2"
+  "spatask": "012Dn000001nco1IAA"
+  "productzeroline": "01tDn000006ut4tIAA"
+  "zeropricebookentryId": "01uDn0000051hrTIAQ"
+pricebook:
+  standard: "01sDn000001aaxVIAQ"
+notification:
+  concurrency: "1"
+sql:
+  saleswarehouse: "SELECT * FROM SalesForce.dbo.SalesWhse WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+  saleswarehouserelationship: "SELECT * FROM SalesForce.dbo.Cust_SalesWhseRelationship"
+  accounts:
+    customer.retrieve: "SELECT * FROM SalesForce.dbo.Customers WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+    vendor.retrieve: "SELECT * FROM SalesForce.dbo.Vendors WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+    manager.retrieve: "SELECT * FROM SalesForce.dbo.AccountManager WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+    manager.relationship: "SELECT  * FROM  SalesForce.dbo.AccountManagerRelationship_ShipTo WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+  shipto: "SELECT  * FROM SalesForce.dbo.ShipTos WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+  customerno: "SELECT * FROM SalesForce.dbo.AccountManagerRelationship_Custno WHERE Last_update_date >= :LastUpdateDate and Last_update_date <= :CurrentUpdateDate"
+  spatask: "SELECT  * FROM SalesForce.dbo.SPA_Tasks WHERE LastUpdated >= :LastUpdateDate and LastUpdated <= :CurrentUpdateDate" 
+  product: "SELECT * FROM SalesForce.dbo.Product"
+  order: "SELECT * FROM SalesForce.dbo.Order_Header WHERE Stage='Order'"
+  orderzerolines: "SELECT * FROM SalesForce.dbo.Order_Header WHERE Stage='Order' and LineCount='0'"
+  orderlines: "SELECT * FROM SalesForce.dbo.Order_Lines WHERE  Stage='Order'"  
+  quote: "SELECT * FROM SalesForce.dbo.Order_Header WHERE Stage='Quote'"
+  quotelines: "SELECT * FROM SalesForce.dbo.Order_Lines WHERE Stage = 'Quote'"
+  invoice: "SELECT * FROM SalesForce.dbo.Invoice_Header WHERE Stage='Invoice' or Stage='Paid'"
+  invoicelines: "SELECT * FROM SalesForce.dbo.Invoice_Lines"
+  shipment: "SELECT * FROM SalesForce.dbo.Shipment_Header WHERE Stage='Shipment'"
+  shipmentlines: "SELECT * FROM SalesForce.dbo.Shipment_Lines"
+  nightly:
+    saleswarehouse: "SELECT * FROM SalesForce.dbo.SalesWhse"
+    saleswarehouserelationship: "SELECT * FROM SalesForce.dbo.Cust_SalesWhseRelationship"
+    accounts:
+      customer.retrieve: "SELECT * FROM SalesForce.dbo.Customers"
+      vendor.retrieve: "SELECT * FROM SalesForce.dbo.Vendors"
+      manager.retrieve: "SELECT * FROM SalesForce.dbo.AccountManager"
+      manager.relationship: "SELECT  * FROM  SalesForce.dbo.AccountManagerRelationship_ShipTo"
+    shipto: "SELECT  * FROM SalesForce.dbo.ShipTos"
+    customerno: "SELECT * FROM SalesForce.dbo.AccountManagerRelationship_Custno"
+    spatask: "SELECT  * FROM SalesForce.dbo.SPA_Tasks"

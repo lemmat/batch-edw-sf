@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="product" doc:id="68d73e67-25ef-4730-9dbd-34b9a8c875f6">
+		<scheduler doc:name="10_Scheduler" doc:id="25577994-f580-448e-bdda-8c8dde1e90ca" >
+			<scheduling-strategy >
+				<cron expression="0 0 8 1/1 * ? *" />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="feb2afb3-90aa-470e-85bb-3ae047901d74" message="Job Triggered for product"/>
+		<set-variable value="product" doc:name="Set job Variable" doc:id="0903306d-9503-41ec-be20-1637a90ff7d7" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="9ef20071-6be4-407e-93af-1141af8e1198" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve product" doc:id="3125ba18-0a52-474c-9cbd-646a34baec36" key="product" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[p('sql.product')]" doc:name="Set  SqlStatement Variable" doc:id="08d993ee-df49-45ec-af50-ad6d889b78e2" variableName="sqlStatement"/>
+		<logger level="INFO" doc:name="Logger" doc:id="49243964-cccb-4f14-9d20-83953689cf4b" message="Product Statement:  #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select product" doc:id="3a2b6d19-335e-4752-975e-fcbf112e03ff" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="b3cf6498-1c94-4f24-adac-9fe920e5ca9f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="product-batch-job" doc:id="1550254c-454e-49e4-88a6-b801d7bda434" maxFailedRecords="-1" blockSize="${batch.product.blocksize}" maxConcurrency="${batch.product.concurrency}" jobInstanceId='#["product-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="24b6ab08-0b0d-4a7a-8115-567603da3030" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="4b52601c-dde8-42ee-b33f-6da688b3810d" size="${batch.product.batch}">
+						<ee:transform doc:name="payload" doc:id="0a2723e7-51df-4757-997e-0a8cdc5a4097" >
+							<ee:message >
+								<ee:set-payload resource="dw/product-upert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="5df86a7b-bb44-47b8-a005-3457f7c36c94" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 operation="upsert" doc:name="Create job bulk api v 2" doc:id="4fa5a76f-bb38-4e5a-bfd5-84a92e6096ae" config-ref="Salesforce_Config" columnDelimiter="CARET" objectType="Product2" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="912685e3-8893-440b-b8d1-e450cc99e90a" message="Product UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="e954d95f-1616-4e3d-ba7d-c3b199c249f0" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="eaf65725-df67-4569-b2e7-437c687cf106" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="35ab995f-d190-4be4-823d-4ba17036dcd8" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="c3daa992-41ed-4e12-bef0-68aa609df007" size="${batch.product.batch}">
+						<ee:transform doc:name="product" doc:id="5d57f796-9221-44fd-8e90-f52d91c2808d" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "Product records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "Product records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/product-upert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="f992e88a-8c46-4b1e-8f09-51d30a1f03d6" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="0a6b7380-5f24-4efc-8d17-f8f77ca148ba" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store product" doc:id="9b6383a8-c4fe-4a08-a256-0d7bd1f100a1" key="product" objectStore="ProductobjectStore">
+					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="91e8b712-60cf-4373-a351-2f0015a62db3" message="Job End for product : #[payload]"/>
+				<choice doc:name="Choice" doc:id="8c4ed11b-3999-48ae-aea7-34b5142a1a2a" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="44d6a731-91fd-4685-a464-1a91444378af" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+							<flow-ref doc:name="product-pricebook-entry Reference" doc:id="d4da6b5a-ae62-49cb-9f30-da5d73307658" name="product-pricebook-entry"/>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="product-pricebook-entry" doc:id="52e04562-1502-44a7-b4fc-d9a7bc57e40b" >
+		<scheduler doc:name="Scheduler" doc:id="ccaef1cd-46d6-40df-91d8-9df752969b8d" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="d650d5e3-8bed-4f29-9fcf-6e329b73974c" message="Job Triggered for product-pricebook-entry"/>
+		<set-variable value="pricebookentry" doc:name="Set job Variable" doc:id="c1faae2e-0387-4c8e-8b7d-a682c4165758" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="afa4f6c7-e383-40ac-b645-607baa0624ae" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve pricebookentry" doc:id="b70c0e4d-7156-4bec-a262-902413c231a1" key="pricebookentry" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[p('sql.product')]" doc:name="Set  SqlStatement Variable" doc:id="18d40b75-c300-40b3-919d-2a1a973ca6cc" variableName="sqlStatement"/>
+		<logger level="INFO" doc:name="Logger" doc:id="c6757f63-8e45-46bb-af96-54260e71ac8a" message="product-pricebook-entry Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select product" doc:id="275aa46e-96dc-4b70-92a4-4ebe206ae1e3" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="86fdf4c4-0731-46b4-a857-7997f67897c9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="product-pricebook-entry-batch-job" doc:id="e08b6a05-31e7-4dc4-a3ec-fe665d8fbaa1" maxFailedRecords="-1" blockSize="${batch.product.blocksize}" maxConcurrency="${batch.product.concurrency}" jobInstanceId='#["pricebook-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="f1af0750-248f-4ed0-ae6e-6d40daeb6524" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="ff3433cd-b9dc-4c0a-a0a3-e16bf082adee" size="${batch.product.batch}">
+						<ee:transform doc:name="payload" doc:id="fc2ea3cc-4f04-474a-b19b-114b09941a28" >
+							<ee:message >
+								<ee:set-payload resource="dw/product-pricebookentry-create.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="f42d1b38-8636-42a8-82f5-e8e42f3059e0" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 operation="upsert" doc:name="Create job bulk api v 2" doc:id="2b1d3d52-1c38-4dbd-ab6f-5fd83489da8e" config-ref="Salesforce_Config" columnDelimiter="CARET" objectType="PricebookEntry" externalIdFieldName="Id" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="80402543-c766-41a6-9391-054c0470c117" message="Product-PriceBookEntry CreateResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="6f96e902-29b2-422c-8acc-8f983c2a25e5" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="7727b694-51c9-4668-92cd-0095e69c0d34" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="84374d0e-2d9a-4d21-872a-a8f6176108c5" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="ff97aaa8-b480-47f4-b8be-aa1bb6d13c0f" size="${batch.product.batch}">
+						<ee:transform doc:name="pricebook" doc:id="f65b7062-636a-4125-918d-579f3ddf5276" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "Pricebook records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "Pricebook records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/product-pricebookentry-create.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="36f1b1af-a753-4f2d-9ee2-c07813bbed72" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="0e417227-942a-4c1a-ad3f-9824187f8d64" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="3be2b551-846c-4472-8621-4a574bbf6f19" key="pricebookentry" objectStore="ProductobjectStore">
+					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="33c3a0c8-4d16-41e0-9765-271a2123bd61" message="Job End for product-pricebookentry : #[payload]"/>
+				<choice doc:name="Choice" doc:id="619c43cd-c9f0-49d7-ad11-158bc4630c82" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="4ffd91b0-7a09-4a55-b5dd-fa43fc8543f4" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="02667fe0-9511-4851-8a60-637c73986b23" >
+							<flow-ref doc:name="order Reference" doc:id="04a6d4df-8e26-4ac7-9c7e-c9b019d7f8e3" name="order" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	</mule>

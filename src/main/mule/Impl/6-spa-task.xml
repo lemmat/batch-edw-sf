@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="spatask"
+		doc:id="a84c41eb-2051-40e5-826a-638a62355cd9">
+		<!-- <scheduler doc:name="9_Scheduler" doc:id="78d0bd54-cd92-482e-a8e6-14c2d02b8edf" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger"
+			doc:id="b5a31e61-8cac-4324-9dcf-9730b9db54dc"
+			message="Job Triggered for SPATask" />
+		<set-variable value="SPATask" doc:name="Set job Variable" doc:id="d6f12ecd-3610-416f-a450-8498994cb564" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="69472e81-8a1f-442c-84e3-de25fe646a15" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve SPATask"
+			doc:id="4f5f51b8-ea37-495c-ab0b-089daad1ea5e" key="spatask"
+			objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[now() as DateTime as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="9374ed8a-7dc7-4086-b1da-f6b3d6ff9358" >
+			<when expression="#[(vars.isNightly default false) == true]">
+				<set-variable value="#[p('sql.nightly.spatask')]" doc:name="Set  SqlStatement Variable" doc:id="8d591802-01d6-42ec-adfe-a5ed09549122" variableName="sqlStatement" />
+			</when>
+			<otherwise >
+				<set-variable value="#[p('sql.spatask')]" doc:name="Set  SqlStatement Variable" doc:id="a1b4b236-cb7a-4adc-9250-07b3dc0ceb8f" variableName="sqlStatement" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger"
+			doc:id="0952fa37-4a98-45bc-a0fb-f54229730bbd"
+			message="spatask Statement:  #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]" />
+		<db:select doc:name="Select SPATask" doc:id="71d81c58-98bb-4f30-bff6-9e84887433c3" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload"
+			doc:id="3280a050-0515-409e-b3b4-59f5a8372ea8">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="spatask-batch-job"
+			doc:id="7ee8b4eb-5c2f-4c3c-8bdc-84b44766cd97" maxFailedRecords="-1" blockSize="${batch.spatask.blocksize}" maxConcurrency="${batch.spatask.concurrency}" jobInstanceId='#["spatask-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records>
+				<batch:step name="Check_Data_Step" doc:id="3b0739fd-5d3c-49f3-8bf2-8aeb51e989fb" >
+					<choice doc:name="Choice" doc:id="bcb3d478-83d7-4f93-8e86-f0f4763d1d4b" >
+						<when expression='#[(payload."CustomerNo" == 0)]'>
+							<salesforce:query doc:name="without customer number Query" doc:id="cdfdd877-f8e8-4982-8c86-f6e84b1a696d" config-ref="Salesforce_Config" target="sfRes" >
+								<salesforce:salesforce-query ><![CDATA[select Id from Task where ActivityDate=:EndDate and Contract_No__c=':ContractNo' and Sales_Rep_Initials__c=':SlsRepID' and Vendor__r.Vendor_External_ID__c=':VendorNo']]></salesforce:salesforce-query>
+								<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"EndDate" : payload.EndDate  as Date default null,
+	"ContractNo": payload."ContractNo",
+	"SlsRepID": payload."SlsRepID",
+	"VendorNo": payload."VendorNo"
+}]]]></salesforce:parameters>
+							</salesforce:query>
+						</when>
+						<otherwise >
+							<salesforce:query doc:name="Query" doc:id="0222781b-49d1-469f-b33d-8e9752ff085c" config-ref="Salesforce_Config" target="sfRes">
+						<salesforce:salesforce-query><![CDATA[select Id from Task where ActivityDate=:EndDate and Contract_No__c=':ContractNo' and Customer_Number__r.Customer_Number__c	= ':CustomerNo' and Sales_Rep_Initials__c=':SlsRepID' and Vendor__r.Vendor_External_ID__c=':VendorNo']]></salesforce:salesforce-query>
+						<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"EndDate" : payload.EndDate  as Date default null,
+	"ContractNo": payload."ContractNo",
+	"CustomerNo": payload."CustomerNo",
+	"SlsRepID": payload."SlsRepID",
+	"VendorNo": payload."VendorNo"
+}]]]></salesforce:parameters>
+					</salesforce:query>
+						</otherwise>
+					</choice>
+				</batch:step>
+				<batch:step name="Record_Exists_Step" doc:id="02dfdd94-93cf-432d-8e7c-04b9f2ff7b37" acceptExpression="#[not isEmpty(vars.sfRes)]">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="5344bb4e-b2fa-4cab-8652-db0c04db73e0" size="200">
+						<logger level="WARN" doc:name="Logger" doc:id="693d2bde-8b88-41cf-a200-ee1234bdd4fc" message="Record Exists in SF, Ignore the record : #[output application/json indent=false --- payload ]"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step"
+					doc:id="8be231db-e035-430a-84ea-de19b25fce3e" acceptExpression="#[isEmpty(vars.sfRes)]">
+					<batch:aggregator doc:name="Batch Aggregator"
+						doc:id="af6a740b-b357-434a-b4b3-eb0a827d3b14" size="${batch.spatask.batch}">
+						<ee:transform doc:name="payload" doc:id="6ade4208-610b-449b-aab4-74d316f0d1f5" >
+							<ee:message >
+								<ee:set-payload resource="dw/spatask-create.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="985efce4-795b-473b-a6d4-0499392f5160" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create task Job bulk api v 2" doc:id="196e7078-e57c-4cd7-b7e4-e2ba3bd7fab2" config-ref="Salesforce_Config" objectType="task" operation="insert" columnDelimiter="CARET" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="e56f2a40-7cf0-42e5-b58c-f4ecc082dad1" message="SPATask CreateResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="84fd7869-2be0-44db-a1f0-94bee078d125" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="8b4693fa-aa29-4b7c-83a3-817094a2881a" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure"
+					doc:id="64896bf7-063c-4209-b3b7-eb295c5c3cf2"
+					acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="09af9964-2f5d-4c4b-870d-111c61a9b34c" size="${batch.spatask.batch}">
+						<ee:transform doc:name="spatask" doc:id="61021b57-3a10-48e2-a138-3f03c3c44741" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "SPATask records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "SPATask records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/spatask-create.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="b5bae81a-2e33-4b5a-ac25-2ce495a2bc38" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message"
+					doc:id="f71970a0-d740-4c2e-8560-613bd4758669">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store"
+					doc:id="d2a5c459-85a5-49b2-938e-751c6baebf10"
+					key="spatask" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[(vars.currentUpdateDate - |PT2H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger"
+					doc:id="e1c81591-1e05-4aac-b808-d178d7498ae5"
+					message="Job End for SPATask : #[payload]" />
+					<choice doc:name="Choice" doc:id="3e60195d-2e77-43ab-906b-b6bf100908c1" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="1b17ca4e-3efc-4fbe-be3d-c73432108817" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="4ca96443-58f4-442f-98b8-641d46ea87f1" >
+							<flow-ref doc:name="quote Reference" doc:id="9c990306-977e-40e9-911d-432c83be8e77" name="quote" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+</mule>

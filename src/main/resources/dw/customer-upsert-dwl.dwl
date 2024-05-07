@@ -1,0 +1,37 @@
+%dw 2.0
+output application/csv separator='^'
+---
+payload map (item) -> {
+	"Name": item."AccountName" replace /['\r\n|"']/ with "",
+	"RecordTypeId": p('record.customer'),
+	"External_Unique_ID__c": item."AccountNumber" as String default null,
+	"AccountNumber": item."AccountNumber" as String,
+	"BillingStreet": ((item."BillingAddress01" default "") ++ (item."BillingAddress02" default "") ++ (item."BillingAddress03" default "")) replace /['\r\n|"']/ with "",
+	"BillingCity": item."BillingCity",
+	"BillingState": item."BillingState",
+	"BillingPostalCode": item."BillingZip",
+	"BillingCountry": item."BillingCountry",
+	"Account_Group__c": item."GroupID",
+	"Phone": item."PhoneNumber",
+	"Sic": item."SICCD",
+	"Sales_Warehouse__r.External_ID__c": item."Branch",
+	"Warehouse__c": item."whse",
+	"Customer_Type__c": item."CustomerType",
+	"User__c": item."CreditManager",
+	"Credit_Limit__c": item."CreditLimit",
+	"NAICS_Code__c": item."NAICS",
+	"Customer_Price_Type__c": item."CustomerPriceType_Name",
+	"Period_Balance_1__c": item."custperiodbal_01",
+	"Period_Balance_2__c": item."custperiodbal_02",
+	"Period_Balance_3__c": item."custperiodbal_03",
+	"Period_Balance_4__c": item."custperiodbal_04",
+	"Period_Balance_5__c": item."custperiodbal_05",
+	"Average_Days_to_Pay__c": item."AverageDaysToPay",
+	"Last_Payment_Amount__c": item."LastPayAmount",
+	"Last_Payment_Date__c": item."LastPayDate" as Date default null,
+	"High_Balance__c": item."HighBalance",
+	"Date_of_Last_Sale__c": item."LastSaleDate" as Date default null,
+	"Date_Account_was_Opened__c": item."DateOpened" as Date default null,
+	"Sales_YTD__c": item."YTDSales",
+	"Last_Year_Sales_YTD__c": item."LastYTDSales"
+}

@@ -1,0 +1,30 @@
+<html>
+<style>
+	table,
+	th,
+	td {
+		border: 1px solid black;
+		border-collapse: collapse;
+	}
+</style>
+
+<body>
+	<table>
+		<thead>
+			<tr>
+				<th>replayId</th>
+				<th>payload</th>
+				<th>errorDescription</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>#[vars.replayId]</td>
+				<td>#[vars.applicationData]</td>
+				<td>#[vars.errorDescription]</td>
+			</tr>
+		</tbody>
+	</table>
+</body>
+
+</html>

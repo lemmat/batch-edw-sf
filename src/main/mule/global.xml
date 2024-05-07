@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub"
+	xmlns:salesforce-pub-sub="http://www.mulesoft.org/schema/mule/salesforce-pub-sub"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq" xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/salesforce-pub-sub http://www.mulesoft.org/schema/mule/salesforce-pub-sub/current/mule-salesforce-pub-sub.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<api-gateway:autodiscovery apiId="${api.id}"
+		ignoreBasePath="true" doc:name="API Autodiscovery"
+		doc:id="d1110a3b-6b1f-4aca-922c-1f928aa5c463" flowRef="api-main" />
+	<http:listener-config
+		name="api-httpListenerConfig">
+		<http:listener-connection host="0.0.0.0"
+			port="${https.port}" protocol="HTTPS" readTimeout="60000">
+			<tls:context>
+				<tls:key-store type="jks" path="${tls.path}"
+					keyPassword="${secure::tls.password}"
+					password="${secure::tls.password}" />
+			</tls:context>
+		</http:listener-connection>
+	</http:listener-config>
+	<apikit:config name="api-config" api="api.raml"
+		outboundHeadersMapName="outboundHeaders"
+		httpStatusVarName="httpStatus" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="67acd656-dbed-4208-a577-e5cdd3e6dba1" >
+		<db:mssql-connection host="${db.host}" port="${db.port}" user="${db.user}" password="${secure::db.password}" >
+			<db:connection-properties >
+				<db:connection-property key="trustServerCertificate" value="true" />
+			</db:connection-properties>
+		</db:mssql-connection>
+	</db:config>
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="c19fbf9e-ac6a-4f43-8b88-b6713c6db681" />
+	<configuration-properties doc:name="Configuration properties" doc:id="ca3862a0-2e75-4f3e-a109-ec12f4b19fa9" file="config/${env}.yaml"/>
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="5b526c6a-2c5f-4415-9ded-f2854d100e36" file="config/secure/${env}-secure.yaml" key="${property.key}" />
+	<os:object-store name="CommonbjectStore" doc:name="Object store" doc:id="7829fc1b-d910-4d5f-a508-74aff2ee8718" expirationIntervalUnit="DAYS"/>
+	<os:object-store name="LastTimeStampObjectStore" doc:name="Object store" doc:id="f0de4a5b-dd05-4935-88ec-d7d60bd642a6" expirationInterval="0"/>
+	<os:object-store name="CreateProductobjectStore" doc:name="Object store" doc:id="fe808de9-a0ee-47e3-afbb-6f758fd94e47" expirationIntervalUnit="DAYS"/>
+	<os:object-store name="ProductobjectStore" doc:name="Object store" doc:id="a8c20267-a4a9-4297-b86f-183bc3d51f20" expirationIntervalUnit="DAYS"/>
+	<os:object-store name="CreateProductQuoteobjectStore" doc:name="Object store" doc:id="5b230c6a-2a14-46f0-9fde-dcd3f49e9e27" expirationIntervalUnit="DAYS"/>
+	<os:object-store name="UpdateProductOrderLineobjectStore" doc:name="Object store" doc:id="aebc8d36-2adc-4599-8c2d-85fb4a6501a4" expirationIntervalUnit="DAYS"/>
+	
+	<salesforce:sfdc-config name="Salesforce_Config"
+		doc:name="Salesforce Config"
+		doc:id="385d8813-4847-45dd-9cdf-41cb0296d8e4">
+		<salesforce:basic-connection
+			username="${sf.username}" password="${secure::sf.password}"
+			securityToken="${secure::sf.token}" url="${sf.url}" connectionTimeout="${sf.connectionTimeout}" loginRequestTimeout="${sf.loginRequestTimeout}"/>
+	</salesforce:sfdc-config>
+	
+	<global-property doc:name="Global Property" doc:id="864b3a16-73cb-47dc-b50b-eee5ca622ca7" name="env" value="dev" />
+	<configuration doc:name="Configuration" doc:id="a3e73e0f-1a70-45a2-aaf5-9557b9af918c" defaultErrorHandler-ref="api-error-handler" />
+	<global-property doc:name="Global Property" doc:id="454f6471-f092-43ae-bdb9-3ebadf764e77" name="property.key" value="vpE6Mj3M%&amp;6XtgI@" />
+	<email:smtp-config name="Outlook_SMTP" doc:name="Email SMTP" doc:id="239f16aa-551d-4de9-b7d0-2085e6064640" >
+		<email:smtp-connection host="${smtp.host}" port="${smtp.port}" timeoutUnit="MINUTES" >
+			<email:properties >
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<os:object-store name="mcreyObjectStore" doc:name="Object store" doc:id="df000d46-bafd-4f66-a0bc-dea5ac40344c" expirationIntervalUnit="DAYS"/>
+	<http:request-config name="Pardot_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="20b6b79f-a67e-4db1-b71d-a9092b45479b" responseTimeout="120000">
+		<http:request-connection protocol="HTTPS" host="${pardot.host}" port="${pardot.port}" />
+	</http:request-config>
+	<http:request-config name="SFDC_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="04368a22-5e96-4ee4-8170-27324beb5871" >
+		<http:request-connection protocol="HTTPS" host="${sf.host}" port="${sf.port}"/>
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="a750ad1a-b1e2-4f41-8472-81e5f4ab6b6a" >
+		<http:request-connection protocol="HTTPS" host="${system.mcmc.host}" port="${system.mcmc.port}" />
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="f0961d76-10c8-4a63-847c-9e51f0ce8068" file="config/${env}.yaml" />
+	<salesforce-pub-sub:pubsub-config name="Salesforce_PubSub_Config" doc:name="Salesforce PubSub Config" doc:id="1ddba391-ce7c-472b-b4ea-49c3dff3077b" >
+		<salesforce-pub-sub:basic-connection username="${sf.ps.username}" password="${secure::sf.ps.password}" securityToken="${secure::sf.ps.token}" url="${sf.ps.url}"/>
+	</salesforce-pub-sub:pubsub-config>
+	<os:object-store name="Object_store_replayId" doc:name="Object store" doc:id="cea05a31-d31e-4345-901d-c11ed5b1e0db" />
+	<vm:config name="VM_Config" doc:name="VM Config" doc:id="420ad83b-33bd-41d0-99e5-a47ed121da8d" >
+		<vm:queues >
+			<vm:queue queueName="recursiveCall" />
+			<vm:queue queueName="finalData" />
+		</vm:queues>
+	</vm:config>
+</mule>

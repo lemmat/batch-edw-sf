@@ -1,0 +1,35 @@
+%dw 2.0
+output application/csv separator = '^'
+---
+payload map (item) -> {
+	"Invoice_Number__c": item."OrderNumber",
+	"Account__r.External_Unique_ID__c": item."CustomerNumber",
+	"Invoice_Date__c": item."InvoiceDate" as Date  default null,
+	"Order__r.External_ID__c": item."OrderNumber",
+	"Status__c": "Draft",
+	"External_ID__c": item."OrderNumber",
+	"Name": item."OrderNumber",
+	"Customer_Number__r.Customer_Number__c": item."CustomerNumber",
+	"Amount__c": item."OrderAmount",
+	"Ship_To__r.External_ID__c": item."ShipTo",
+	"Ship_To_Name__c": item."ShipToName" replace /['\r\n|"']/ with "",
+	"Stage__c": item."Stage",
+	"Sales_Warehouse__r.External_ID__c": item."SalesWhse",
+	"Salerep_IN__c": item."SalesRepIn",
+	"Salesrep_Out__c": item."SalesRepOut",
+	"Taken_By__c": item."TakenBy",
+	"Placed_By__c": item."PlacedBy",
+	"Entered_Date__c": item."EnterDate" as Date default null,
+	"Customer_PO__c": item."CustomerPO" replace /['\r\n|"']/ with "",
+	"Disposition__c": item."Disposition",
+	"Ship_via__c": item."ShipVia",
+	"Origin_code__c": item."OriginCode",
+	"Origin_Name__c": item."OriginName",
+	"Amount_Due__c": item."AmountDue",
+	"Issued_Date__c": item."InvoiceDate" as Date default null,
+	"Paid_Date__c": item."paiddate" as Date default null,
+	"Total_Tax2__c": item."TotalTax",
+	"Total_Amount2__c": item."OrderAmount",
+	"Total_with_Tax__c": item."OrderAmount",
+	"Ship_Date__c": item."ShipDate" as Date default null
+}

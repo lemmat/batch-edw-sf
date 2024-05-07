@@ -1,0 +1,210 @@
+#%RAML 1.0
+title: batch-process-edw-sf
+description: Batch Job for enterprise data warehouse 
+protocols: HTTPS
+mediaType: application/json
+resourceTypes:
+  collection:
+    usage: Use this resourceType to represent any collection of items
+    description: Get and Update the timestamps
+    get:
+      description: get the last stored timestamp
+      responses:
+        200:
+          body:
+            application/json:
+    post:
+      description: Create a new timestamp
+      body:
+        application/json:
+          type: object
+          properties:
+            timestamp:
+              type: string
+                
+          example: | 
+            {
+              "timestamp": "2022-01-18T01:11:19"
+            }
+      responses:
+         200:
+          body:
+            application/json:
+              example: |
+                  {
+                    "Status": "successfully Updated"
+                  }
+
+/account:
+  /customer:
+    get:
+      responses:
+        200:
+    /lasttimestamp:
+      type:
+        collection:     
+  /vendor:
+    get:
+      responses:
+        200:
+    /lasttimestamp:
+      type:
+        collection:
+  /manager:
+    get:
+      responses:
+        200:
+    /lasttimestamp:
+      type:
+        collection:
+    /relationship:
+      get:
+        responses:
+          200:
+      /lasttimestamp:
+        type:
+          collection:
+/shipto:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+/customerno:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+/saleswarehouse:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+/saleswarehouserelationship:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+/product:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+/pricebook:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+/order:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+  /lines:
+    get:
+      responses:
+       200:
+    /lasttimestamp:
+      type:
+        collection:
+/quote:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+  /lines:
+    get:
+      responses:
+       200:
+    /lasttimestamp:
+      type:
+        collection:
+/invoice:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+  /lines:
+    get:
+      responses:
+       200:
+    /lasttimestamp:
+      type:
+        collection:
+/shipment:
+  get:
+    responses:
+      200:
+  /lasttimestamp:
+    type:
+      collection:
+  /lines:
+    get:
+      responses:
+       200:
+    /lasttimestamp:
+      type:
+        collection:
+/spatask:
+  get:
+   responses:
+     200:
+  /lasttimestamp:
+    type:
+      collection:
+/pardotMc:
+  /lasttimestamp:
+    type:
+      collection:
+/pardotRey:
+  /lasttimestamp:
+    type:
+      collection:
+/query:
+  post:
+    description: "Send the select query to excute"
+    body:
+      application/json:
+        example: | 
+          {
+            "query": "select Id from Table"
+          }
+/salesforce:
+  /job:
+    /status:
+      get:
+        queryParameters:
+          Id:
+            type: string
+            required: true 
+    /failed:
+      get:
+        queryParameters:
+          Id:
+            type: string
+            required: true
+    /success:
+      get:
+        queryParameters:
+          Id:
+            type: string
+            required: true
+/failedorders:
+  get:

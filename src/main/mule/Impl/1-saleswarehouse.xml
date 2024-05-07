@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<flow name="saleswarehouse" doc:id="68d73e67-25ef-4730-9dbd-34b9a8c875f6">
+		<!-- <scheduler doc:name="2_Scheduler" doc:id="a3f435f2-31b6-4292-af8f-4d98e78a90cf" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS" />
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger" doc:id="feb2afb3-90aa-470e-85bb-3ae047901d74" message="Job Triggered for SalesWareHouse"/>
+		<set-variable value="saleswarehouse" doc:name="Set job Variable" doc:id="373e1b27-15f2-4e7c-9108-167e8ba7d49b" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set CurrentUpdateDate Variable" doc:id="29c1402d-8097-407f-8fbf-85bfef4e2459" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve Last_update_date" doc:id="3125ba18-0a52-474c-9cbd-646a34baec36" key="saleswarehouse" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="02bfd1e7-e658-408e-8e6f-3a536bfa6083" >
+			<when expression="#[(vars.isNightly default false) == true]">
+				<set-variable value="#[p('sql.nightly.saleswarehouse')]" doc:name="Set  SqlStatement Variable" doc:id="90175b4f-338f-463a-ac82-dc12017b54fa" variableName="sqlStatement" />
+			</when>
+			<otherwise >
+				<set-variable value="#[p('sql.saleswarehouse')]" doc:name="Set  SqlStatement Variable" doc:id="08d993ee-df49-45ec-af50-ad6d889b78e2" variableName="sqlStatement" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="49243964-cccb-4f14-9d20-83953689cf4b" message="SalesWareHouse Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select SalesWareHouse" doc:id="3a2b6d19-335e-4752-975e-fcbf112e03ff" config-ref="Database_Config" queryTimeoutUnit="MINUTES" queryTimeout="${db.querytimeoutminutes}">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="b3cf6498-1c94-4f24-adac-9fe920e5ca9f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform> 
+		<batch:job jobName="saleswarehouse-batch-job" doc:id="1550254c-454e-49e4-88a6-b801d7bda434" maxFailedRecords="-1" blockSize="${batch.saleswarehouse.blocksize}" maxConcurrency="${batch.saleswarehouse.concurrency}" jobInstanceId='#["saleswarehouse-" ++(now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="24b6ab08-0b0d-4a7a-8115-567603da3030" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="4b52601c-dde8-42ee-b33f-6da688b3810d" size="${batch.saleswarehouse.batch}">
+						<ee:transform doc:name="saleswarehouse" doc:id="7b1bca6b-df04-4453-86b5-f075b3dfd1c0" >
+							<ee:message >
+								<ee:set-payload resource="dw/saleswarehouse-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="8a628b37-e696-43c7-b0d5-696987abf7ba" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job Branch__c" doc:id="97371233-b757-489b-9158-e6c86fd080c6" config-ref="Salesforce_Config" objectType="Branch__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="c35e0227-28e3-44da-a04a-7954d78fc39d" message="SalesWareHouse UpsertResponse: #[output application/json indent=false --- payload]" />
+						<os:store doc:name="jobId" doc:id="cb8e46fc-5614-4121-8605-f0ffae22ba58" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="96db60e3-7671-4396-a1b0-cb643ad0e9b5" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="35ab995f-d190-4be4-823d-4ba17036dcd8" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="75e1e50e-c86e-414b-923e-a5febdf994a2" size="${batch.saleswarehouse.batch}">
+						<ee:transform doc:name="saleswarehouse" doc:id="d200ecbc-b455-44b7-ab7d-58470621d92c" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "Saleswarehouse records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "Saleswarehouse records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/saleswarehouse-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="9453a06f-514b-4f1f-8b88-90fc141db914" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="0a6b7380-5f24-4efc-8d17-f8f77ca148ba" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="9b6383a8-c4fe-4a08-a256-0d7bd1f100a1" key="saleswarehouse" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[(vars.currentUpdateDate - |PT2H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="91e8b712-60cf-4373-a351-2f0015a62db3" message="Job End for SalesWareHouse : #[payload]"/>
+				<choice doc:name="Choice" doc:id="633abf83-31ca-44ae-93fd-29a79fc09597" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="e323e342-eed8-47ff-91c7-714b87b357ff" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="5e21de59-5a80-49a8-9c1e-52dc2ca2bf77">
+								<flow-ref doc:name="customerReference" doc:id="e5da15c3-2e50-4673-928a-b82056958ec7" name="customer" />
+							</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	<flow name="saleswarehouserelationship" doc:id="b242945c-92a2-4955-9dc2-101e05a56193" >
+		<!-- <scheduler doc:name="5_Scheduler" doc:id="af09e2e5-21bd-4d2b-a7dc-f0e24059ec4c" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger" doc:id="aeaab75a-ba59-4b6b-9df3-0ad68de34156" message="Job Triggered for SalesWareHouseRelationship"/>
+		<set-variable value="saleswarehouserelationship" doc:name="Set job Variable" doc:id="4bfc9169-0592-4591-86ee-5330a8c91e0b" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set CurrentUpdateDate Variable" doc:id="c4fb4396-ce72-416a-9531-31ebe8ece801" variableName="currentUpdateDate" />
+		<os:retrieve doc:name="Retrieve currentUpdateDate" doc:id="993674f8-1130-4034-b7a4-06e2a03f0011" key="Last_update_date" objectStore="CommonbjectStore" target="currentUpdateDate">
+			<os:default-value><![CDATA[#[vars.currentUpdateDate]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="0318e212-86cf-45b3-83c5-07a56eb3e136" >
+			<when expression="#[(vars.isNightly default false) == true]">
+				<set-variable value="#[p('sql.nightly.saleswarehouserelationship')]" doc:name="Set  SqlStatement Variable" doc:id="ba9249c7-91b7-4aea-a44c-f4b3ac4598ca" variableName="sqlStatement" />
+			</when>
+			<otherwise >
+				<set-variable value="#[p('sql.saleswarehouserelationship')]" doc:name="Set  SqlStatement Variable" doc:id="ae9d318e-59ad-4c1a-9696-1bb561f5c430" variableName="sqlStatement" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="f3c68403-745c-4d58-98ff-59f43d46cf9b" message="SalesWareHouseRelationship Statement: #[vars.sqlStatement]"/>
+		<db:select doc:name="Select SalesWareHouseRelationship" doc:id="71e4c223-eeb6-4847-be13-8c0673433b94" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="ea1c0aa8-a798-4151-bba4-e80037029c84" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="saleswarehouserelationship-batch-job" doc:id="ede5b154-dc48-4cf3-8206-d638079298ed" maxFailedRecords="-1" blockSize="${batch.saleswarehouserelationship.blocksize}" maxConcurrency="${batch.saleswarehouserelationship.concurrency}" jobInstanceId='#["saleswarehouserelationship-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="96c5d437-d7fb-4621-82da-f7e75b83f17d" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="aea17818-752d-4d41-a4a0-f73044858299" size="${batch.saleswarehouserelationship.batch}">
+						<ee:transform doc:name="Payload" doc:id="e8105029-ab6d-4a5e-8ac4-29992c592d03" >
+							<ee:message >
+								<ee:set-payload resource="dw/saleswarehouse-relationship-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="a110e57e-83ab-41dc-9484-7694cfd1f6af" >
+							<salesforce:create-job-bulk-api-v2 objectType="Branch_ID__c" operation="upsert" doc:name="Create job Branch_ID__c" doc:id="fa118146-ede2-4e5f-87b9-9b4384e721ac" config-ref="Salesforce_Config" externalIdFieldName="Branch_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="c4abd06e-6417-4125-b376-3d1d0640d18d" message="SalesWareHouseRelationShip UpsertResponse: #[output application/json indent=false --- payload]" />
+						<os:store doc:name="jobId" doc:id="f684d8ca-27db-4374-af1f-29d239147b56" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="f5dae10b-baf6-45d5-b870-b4f6c7f98d19" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="5bcfcf29-4f37-4aea-afa0-03f44afcee03" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="0c1eab39-8595-4a73-b9a4-efd94dec91aa" size="100">
+						<ee:transform doc:name="saleswarehouserelationship" doc:id="353f0fe1-4c10-4962-ba72-75e8cbe9f738" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "SaleswarehouseRelationship records failed to publish to Salesforce : " ++ (now() >> "EST") as String {format:"yyyyMMddHHmmss"},
+    "body":  "SaleswarehouseRelationship records failed to publish to Salesforce : " ++ (now() >> "EST") as String {format:"yyyyMMddHHmmss"},
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/saleswarehouse-relationship-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="6bd7d590-04a8-4162-990f-c839984c2993" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="a41328a1-5fd4-4c4f-86e8-f5472f8e7487" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="6d59828b-0ac9-4228-be05-8a3aa523926c" message="Job End for SalesWareHouseRelationship : #[payload]"/>
+				<choice doc:name="Choice" doc:id="2647f526-beb9-46d1-b3ac-66a2c9814256" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="ab8a3b23-f320-423c-9c3b-49061e14e1d3" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="9e1f12f4-88d5-4828-9112-defd149a44fd" >
+							<flow-ref doc:name="customer-number Reference" doc:id="365091b8-c964-49df-a051-fd2b5ed57767" name="customer-number" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	</mule>

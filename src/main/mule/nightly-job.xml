@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<flow name="nightly-job-non-txn" doc:id="739d7540-7a9d-490e-bcef-b9ea50be769d" >
+		<scheduler doc:name="Scheduler" doc:id="6dc62f93-0858-4692-9f6f-58ba7184eafc" >
+			<scheduling-strategy >
+				<cron expression="0 0 5 1/1 * ? *" />
+			</scheduling-strategy>
+		</scheduler>
+		<set-variable value="#[true]" doc:name="Set isNightly Variable" doc:id="fe448380-3843-4419-bf2c-4716e5cea3fe" variableName="isNightly"/>
+		<flow-ref doc:name="account-manager Reference" doc:id="21997d2d-269a-40e6-972a-acc23dc619cf" name="account-manager"/>
+	</flow>
+</mule>

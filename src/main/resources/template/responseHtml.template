@@ -1,0 +1,37 @@
+<html>
+<style>
+	table,
+	th,
+	td {
+		border: 1px solid black;
+		border-collapse: collapse;
+	}
+</style>
+
+<body>
+	<table>
+		<thead>
+			<tr>
+				<th colspan="4">Job Status for Job Id: #[payload.id]</th>
+			</tr>
+		</thead>
+		<thead>
+			<tr>
+				<th>ObjectName</th>
+				<th>TotalRecords</th>
+				<th>SuccessRecords</th>
+				<th>FailedRecords</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>#[payload.object]</td>
+				<td>#[payload.numberRecordsProcessed default 0]</td>
+				<td>#[(payload.numberRecordsProcessed default 0) - (payload.numberRecordsFailed default 0)]</td>
+				<td>#[(payload.numberRecordsFailed default 0)]</td>
+			</tr>
+		</tbody>
+	</table>
+</body>
+
+</html>

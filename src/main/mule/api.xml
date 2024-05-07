@@ -1,0 +1,1052 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd  http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    <flow name="api-main">
+        <http:listener path="/api/*" config-ref="api-httpListenerConfig">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="api-config" />
+    </flow>
+    <flow name="api-console">
+        <http:listener path="/console/*" config-ref="api-httpListenerConfig">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="get:\saleswarehouse:api-config">
+        <logger level="INFO" message="get:\saleswarehouse:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="048092a4-4de2-4ba0-921f-da0f365cd625" variableName="scheme" />
+        <flow-ref doc:name="1-saleswarehouse" doc:id="54216c3e-bd15-4127-8531-eb353b06a894" name="saleswarehouse" />
+        <ee:transform doc:name="Transform Message" doc:id="45fad4a0-6f4d-4843-a472-3f9abf858ccf">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\saleswarehouse\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\saleswarehouse\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="bef84417-2e82-4670-a1d9-84026cb6fa24" key="saleswarehouse" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="eea402ee-622d-43ff-9eca-88870ffa3ac8">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\saleswarehouse\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="5c52bbd1-d56b-4331-9507-85d1a54c6dd5" key="saleswarehouse" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="2e26afec-5fe3-4c5f-a8b5-4846c2924c9b" message="#[payload]" />
+    </flow>
+    <flow name="get:\saleswarehouserelationship:api-config">
+        <logger level="INFO" message="get:\saleswarehouserelationship:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="390be216-548c-4c09-881d-18695fd49d46" variableName="scheme" />
+        <flow-ref doc:name="saleswarehouserelationship Reference" doc:id="b6c65e74-703c-4671-bc3a-12d33f17e8e2" name="saleswarehouserelationship" />
+        <ee:transform doc:name="Transform Message" doc:id="e40bbc58-e8b6-45a8-9cf4-9509268ad7e2">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\saleswarehouserelationship\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\saleswarehouserelationship\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="5d8132b4-7c43-4761-b9f8-6e4265c834e3" key="saleswarehouserelationship" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="de4270e0-9d37-4cfc-a48c-85965526fcd2">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\saleswarehouserelationship\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="c23df2f5-b085-4ac8-ba96-703d4f0caf29" key="saleswarehouserelationship" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="95b316e8-666b-4c2f-86ea-9d6dc51b0db5" message="#[payload]" />
+    </flow>
+    <flow name="get:\account\customer:api-config">
+        <logger level="INFO" message="get:\account\customer:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="a5078629-7306-4052-8bfb-771397e71181" variableName="scheme" />
+        <flow-ref doc:name="accounts-customer Reference" doc:id="0fb802c5-df74-426a-814a-ea35e1f33525" name="customer" />
+        <ee:transform doc:name="Transform Message" doc:id="eb2941e8-3b22-41ee-8bb4-a85d7d85faac">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\account\customer\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\account\customer\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="34748b1b-2c59-4340-a152-0ca2247c6fff" key="customer" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="25e7127a-719a-4e54-b63a-721989001ba9">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\account\customer\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="be311d2e-6aa1-4a27-806e-785e2a20c342" key="customer" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="a9f37776-ef88-4342-a4c9-6b640e4c0d8b" message="#[payload]" />
+    </flow>
+    <flow name="get:\account\vendor:api-config">
+        <logger level="INFO" message="get:\account\vendor:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="4faa8d14-5d0c-41cc-868d-df63e83a406b" variableName="scheme" />
+        <flow-ref doc:name="vendor Reference" doc:id="e4f9031c-858e-4c8a-adda-9d769f0401df" name="vendor" />
+        <ee:transform doc:name="Transform Message" doc:id="6e0bc2ce-dde0-4943-af65-381441a36524">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\account\vendor\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\account\vendor\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="3317d657-3b5d-4f9d-913c-2bfcf610b412" key="vendor" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="198add36-683a-47e6-8b67-fb3d77bf2f89">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\account\vendor\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="6ea8b4e7-4319-4e91-a3a7-41a0d4c9dbba" key="vendor" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="f1a29090-8a8b-40f6-acb2-dbf6326cddbf" message="#[payload]" />
+    </flow>
+    <flow name="get:\account\manager:api-config">
+        <logger level="INFO" message="get:\account\manager:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="875ab508-f8d3-4eac-b109-f10b8022a913" variableName="scheme" />
+        <flow-ref doc:name="AccountManager Reference" doc:id="084f3bfc-916a-4901-ae75-b35d8fc2170c" name="account-manager" />
+        <ee:transform doc:name="Transform Message" doc:id="b5f66f21-db51-4951-9bdb-3c1b85d49064">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\account\manager\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\account\manager\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="7ac977e2-3fd0-4688-8dbd-2895619d1234" key="accountmanager" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="28da6570-a6aa-4c5b-b78e-f2a71f6494d7">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\account\manager\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="f35cb10c-447d-4b6b-a662-d4945835d5b2" key="accountmanager" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="26345720-93bf-4894-8927-8189e436e2d3" message="#[payload]" />
+    </flow>
+    <flow name="get:\account\manager\relationship:api-config">
+        <logger level="INFO" message="get:\account\manager\relationship:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="8e08150e-9a08-45a3-b363-04785e864c61" variableName="scheme" />
+        <flow-ref doc:name="account-manager-relationship Reference" doc:id="e9e0c691-2e71-4bce-8a4d-35b747eabcfa" name="account-manager-relationship" />
+        <ee:transform doc:name="response" doc:id="ae111ade-ed38-4d32-9050-cc8f6cd7da77">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\account\manager\relationship\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\account\manager\relationship\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="104d1bd8-59ea-4544-a9fd-abb23b37a98b" key="accountmanagerrelationship" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="7e83b3c3-922d-4a50-994c-93ea314bd292">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\account\manager\relationship\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="3ceca6c1-bc2f-4625-8883-18b76bdb72b7" key="accountmanagerrelationship" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="eb962364-ebc4-4e09-a6d4-6e28a989409f" message="#[payload]" />
+    </flow>
+    <flow name="get:\customerno:api-config">
+        <logger level="INFO" message="get:\customerno:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="d6e6e070-dd40-4668-97e7-aa05da8f5cf0" variableName="scheme" />
+        <flow-ref doc:name="CustomerNumber FlowReference" doc:id="5f92d654-cd4d-44a8-bd8a-54b163d5134d" name="customer-number" />
+        <ee:transform doc:name="Transform Message" doc:id="2f4bf693-82fa-4653-80b9-f59e910d8f42">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\customerno\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\customerno\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="559add67-0218-4199-b63f-570632b77ed3" key="customernumber" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="53e4f50d-e964-4843-a9a1-38b70ab96717">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\customerno\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="21805f81-1896-4c2d-b1f1-cee820bec8fd" key="customernumber" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="a4f13e4f-a282-4002-b1f0-24984003e7e5" message="#[payload]" />
+    </flow>
+    <flow name="get:\shipto:api-config">
+        <logger level="INFO" message="get:\shipto:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="5c1d5da2-0fc7-4771-9fba-47e154417328" variableName="scheme" />
+        <flow-ref doc:name="shipto Reference" doc:id="106ff396-02c3-42d4-965c-0897f4d8e05f" name="shipto" />
+        <ee:transform doc:name="Transform Message" doc:id="18817bb6-a58c-4528-903b-880ba03d2242">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\shipto\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\shipto\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="cc86ceee-2cae-4e51-b887-bfee93f0a774" key="shipto" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="62c64731-b947-405c-b0c1-4ae1f7c89b93">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\shipto\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="eab30e8a-c256-4d7c-b282-4dfa915ad8d6" key="shipto" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="6da33142-324f-461c-9e0d-c55fd122d94c" message="#[payload]" />
+    </flow>
+    <flow name="get:\spatask:api-config">
+        <logger level="INFO" message="get:\spatask:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="486c6b3e-870b-48c1-99bc-c6993b77534c" variableName="scheme" />
+        <flow-ref doc:name="spatask Reference" doc:id="5b9c6873-da8a-424a-b3b9-62a578d9e2c8" name="spatask" />
+        <ee:transform doc:name="Transform Message" doc:id="342051d2-d3a4-4920-b782-fc09d16b22dd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\spatask\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\spatask\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="979519b2-226d-4b64-80a9-cf965c00a44f" key="spatask" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="d0cc6961-4578-4a2b-b6e2-d1aa66e89389">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\spatask\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="94ad5b6f-5d5e-45cc-a2da-54dab7a5f320" key="spatask" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="812b5742-8db6-46e2-a16c-9cf112b09396" message="#[payload]" />
+    </flow>
+    <flow name="get:\product:api-config">
+        <logger level="INFO" message="get:\product:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="18467ffa-3d79-4521-94e8-83016eb4c5e8" variableName="scheme" />
+        <flow-ref doc:name="Product Reference" doc:id="5e5e9d43-be7b-4408-9355-b2bc9a5941bc" name="product" />
+        <ee:transform doc:name="Transform Message" doc:id="d894d85d-72bb-41de-912d-ab7225911d00">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\product\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\product\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="9f782a60-d29e-4be7-9302-1e606d688b3a" key="product" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="986f76fb-d968-47b9-9907-434ab45b9fc3">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\product\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="1085f3e8-f1e0-40c6-8144-a0593a604cf8" key="product" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="98ff6fb7-f3fa-4f9a-86d5-51e3433e379e" message="#[payload]" />
+    </flow>
+    <flow name="get:\pricebook:api-config">
+        <logger level="INFO" message="get:\pricebook:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="0836b84d-bc86-4e95-b0bf-409138aedc2d" variableName="scheme" />
+        <flow-ref doc:name="PriceBook Reference" doc:id="7a3a96a0-c9ee-4346-8ead-9e7e6d3f8b25" name="product-pricebook-entry" />
+        <ee:transform doc:name="Transform Message" doc:id="e10d14f8-d4c7-4636-90ba-078beaa501a3">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\pricebook\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\pricebook\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="6224553d-5df3-41ec-8b54-768e38bc7e91" key="pricebookentry" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="b2406a06-472a-4c70-b3fa-cacff48f51f1">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\pricebook\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="d5a8f86a-b26f-4a76-91b0-a1c3b81bbdb3" key="pricebookentry" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="eca87990-7592-4a1f-b850-1a500f609dd7" message="#[payload]" />
+    </flow>
+    <flow name="get:\order:api-config">
+        <logger level="INFO" message="get:\order:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="b609094d-59f7-4d4e-b777-39364f86dec1" variableName="scheme" />
+        <flow-ref doc:name="Order Reference" doc:id="5fd4f340-ceb1-4ea7-98c6-51a07dda3430" name="order" />
+        <ee:transform doc:name="Transform Message" doc:id="d8986777-e730-43aa-8018-352277f52c9b">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\order\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\order\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="7a104676-9a3e-4574-babf-001ab6b7700a" key="order" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="e76fd933-85a6-457e-874c-b979db7db8e0">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\order\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="5da8c3fe-1efb-4849-a829-9690837f9beb" key="order" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="f25258c4-b2ea-4c4e-a71b-f3367b066de6" message="#[payload]" />
+    </flow>
+    <flow name="get:\quote:api-config">
+        <logger level="INFO" message="get:\quote:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="bff25c05-b62e-4265-ac5c-a72423099641" variableName="scheme" />
+        <flow-ref doc:name="Quote Reference" doc:id="dfc33ffa-c387-47dc-887b-25fc394b9129" name="quote" />
+        <ee:transform doc:name="Transform Message" doc:id="22b68eb7-fc0d-4495-b49f-4055327fe13a">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\quote\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\quote\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="7dd29f5c-37b2-4961-b2c2-4b0bec3cf2f9" key="quote" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="48e00539-a183-43ea-a460-cbc214c00328">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\quote\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="c325397c-82e7-49e0-b6a7-72507ef57112" key="quote" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="eda1c768-7ec7-4bda-a4e7-4187ce2db225" message="#[payload]" />
+    </flow>
+    <flow name="get:\invoice:api-config">
+        <logger level="INFO" message="get:\invoice:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="d1872b94-43be-428e-a970-897da1eaf33b" variableName="scheme" />
+        <flow-ref doc:name="Invoice Reference" doc:id="005d4206-7a02-452b-a609-f0fb244d29ae" name="invoice" />
+        <ee:transform doc:name="Transform Message" doc:id="88c16a6d-6701-4072-938b-b50c1560d490">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\invoice\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\invoice\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="fd243334-b0a2-4b8e-8003-d72dbaaa6859" key="invoice" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="d0a620cd-6985-40cb-9792-500c5523337e">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\invoice\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="3b2a3bc7-bcc4-44a8-a981-06d50b2a605a" key="invoice" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="679bf316-b111-437e-a494-7def8bc82c8e" message="#[payload]" />
+    </flow>
+    <flow name="get:\shipment:api-config">
+        <logger level="INFO" message="get:\shipment:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="a094c706-dff6-4b17-b48a-e5100e4f1f5f" variableName="scheme" />
+        <flow-ref doc:name="Flow Shipment" doc:id="4db9fce4-41fc-4302-9278-1a52980ec016" name="shipment" />
+        <ee:transform doc:name="Transform Message" doc:id="76305615-de96-4b1a-a676-b174703a44f4">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\shipment\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\shipment\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="e145936b-3512-414c-a2ef-6cc783e5a8f9" key="shipment" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="de870241-2b96-415e-9c6a-3fdd718244a1">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="post:\shipment\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="0d33e5f6-1cad-4e66-a720-e3c75bf33b88" key="shipment" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="0a7d7036-b1cc-41e3-b4be-b5e324a8cfae" message="#[payload]" />
+    </flow>
+    <flow name="get:\order\lines\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\order\lines\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="d1f395c0-3d38-43f8-980e-463ce8145815" key="orderlines" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="52d4bc16-fdb0-4049-b7cf-5e0c0ef98b44">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="get:\invoice\lines\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\invoice\lines\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="5e08f2f2-41d6-4f49-a3a3-4f43085804fd" key="invoicelines" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="e355b607-8f67-424b-b136-d9ab437d20ae">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="get:\shipment\lines\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\shipment\lines\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="478af3b9-6189-4651-83b0-75c670b51c32" key="shipmentlines" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="08654471-521b-4016-a051-dbdfdda6a180">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="get:\quote\lines\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\quote\lines\lasttimestamp:api-config" />
+        <os:retrieve doc:name="Retrieve" doc:id="1739adca-5f3d-499e-9b65-4f86d5839aae" key="quotelines" objectStore="LastTimeStampObjectStore">
+            <os:default-value><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+        </os:retrieve>
+        <ee:transform doc:name="Transform Message" doc:id="7ea4147b-bf02-4b46-a1b9-239116bd5025">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" message="#[payload]" />
+    </flow>
+    <flow name="get:\shipment\lines:api-config">
+        <logger level="INFO" message="get:\shipment\lines:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="723f6dc0-087c-4897-9b98-6298d15e33b8" variableName="scheme" />
+        <flow-ref doc:name="Flow ShipmentLines" doc:id="08d69911-4165-447a-847e-744018732a12" name="shipmentlines" />
+        <ee:transform doc:name="Transform Message" doc:id="3c5d3ac4-2091-488e-bc2c-2e8bd3827916">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\order\lines:api-config">
+        <logger level="INFO" message="get:\order\lines:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="a97306c7-7e22-412b-a512-64a9dec2ed50" variableName="scheme" />
+        <flow-ref doc:name="Flow OrderLine" doc:id="fcc0ca31-2d23-492c-b2e1-328b3bf9952e" name="orderLine" />
+        <ee:transform doc:name="Transform Message" doc:id="44bc0316-980c-46da-9b79-42cd8c16b3c8">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\quote\lines:api-config">
+        <logger level="INFO" message="get:\quote\lines:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="62476a54-40a6-458c-8148-9ec905337476" variableName="scheme" />
+        <flow-ref doc:name="Flow QuoteLines" doc:id="9d361a38-d80b-4e5c-b342-15c7cc1aa98a" name="quotelines" />
+        <ee:transform doc:name="Transform Message" doc:id="94a3d3f9-dbf0-4648-98b1-92dbaa959fe8">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\invoice\lines:api-config">
+        <logger level="INFO" message="get:\invoice\lines:api-config" />
+        <set-variable value="#[attributes.scheme]" doc:name="Set scheme Variable" doc:id="1bc0cb01-436c-44e2-93e4-2455a906c526" variableName="scheme" />
+        <flow-ref doc:name="Flow InvoiceLines" doc:id="7e6fba2f-e82a-421e-887d-456729ec3a0f" name="invoicelines" />
+        <ee:transform doc:name="Transform Message" doc:id="89f10667-1af5-4187-aa92-228ef9b37235">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\order\lines\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="32c565eb-2a02-418d-960c-a60127973894" key="orderlines" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="f6a9509d-7a9b-47da-9eda-07cbddc26a3e" message="#[payload]" />
+    </flow>
+    <flow name="post:\shipment\lines\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="2ac29825-0edf-4539-bc5f-ef85593a6273" key="shipmentlines" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="0cbd7993-2cc7-4e6e-a13e-d0863c48df9f" message="#[payload]" />
+    </flow>
+    <flow name="post:\invoice\lines\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="eb2eb747-42c2-4098-8ae3-a59a038af77f" key="invoicelines" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="aa6ac499-4c2f-40ef-aecb-1371e598feff" message="#[payload]" />
+    </flow>
+    <flow name="post:\quote\lines\lasttimestamp:application\json:api-config">
+        <os:store doc:name="Store" doc:id="515d6041-3e43-41cc-8db9-ce37a17f1b27" key="quotelines" objectStore="LastTimeStampObjectStore">
+            <os:value><![CDATA[#[payload.timestamp]]]></os:value>
+        </os:store>
+        <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <logger level="INFO" doc:name="Logger" doc:id="5419ee8b-5a8a-4adc-bba3-699ca6b5254b" message="#[payload]" />
+    </flow>
+    <flow name="get:\salesforce\job\failed:api-config">
+        <logger level="INFO" message="get:\salesforce\job\failed:api-config" />
+        <flow-ref doc:name="Flow  failed Reference" doc:id="33466052-98e2-4892-b14b-818fa3243a36" name="sf-failure-impl" />
+    </flow>
+    <flow name="get:\salesforce\job\status:api-config">
+        <logger level="INFO" message="get:\salesforce\job\status:api-config" />
+        <flow-ref doc:name="Flow status Reference" doc:id="6bb6edec-deca-4014-8dd9-51cb69a9e29a" name="sf-status-impl" />
+    </flow>
+    <flow name="get:\salesforce\job\success:api-config">
+        <logger level="INFO" message="get:\salesforce\job\success:api-config" />
+        <flow-ref doc:name="sf-success-impl Reference" doc:id="e1d4f1f5-72df-4783-b6ec-b1d8b914fe96" name="sf-success-impl" />
+    </flow>
+    <flow name="post:\query:application\json:api-config">
+        <logger level="INFO" message="post:\query:application\json:api-config" />
+        <flow-ref doc:name="common-select-flow Reference" doc:id="464ce533-0893-47a1-80fd-b7574c6e8eb5" name="common-select-flow" />
+    </flow>
+    <flow name="get:\failedorders:api-config">
+        <logger level="INFO" message="get:\failedorders:api-config" />
+        <os:retrieve-all doc:name="Retrieve all" doc:id="0f5c2ae1-bad0-47eb-a993-4aadd5d4de81" objectStore="CreateProductobjectStore" />
+        <ee:transform doc:name="Transform Message" doc:id="4f52c9c6-e3bc-40fe-a76e-5ead3323046f">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\pardotRey\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\pardotRey\lasttimestamp:api-config" />
+		<os:retrieve doc:name="Retrieve" doc:id="077a209a-b71d-4a60-a818-242b1be9fe07" key="reyLastDateTime" objectStore="mcreyObjectStore" >
+			<os:default-value ><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<ee:transform doc:name="Transform Message" doc:id="983cc1d3-d9c1-4af5-86e7-f680eb8a2d59" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="212dfbde-12fc-4e2f-b5fc-0b384fe25020" message="#[payload]" />
+    </flow>
+    <flow name="get:\pardotMc\lasttimestamp:api-config">
+        <logger level="INFO" message="get:\pardotMc\lasttimestamp:api-config" />
+		<os:retrieve doc:name="Retrieve" doc:id="54fcc0fb-1e73-4284-bd20-03aeeae9d0d8" key="mcLastDateTime" objectStore="mcreyObjectStore" >
+			<os:default-value ><![CDATA[#[(now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<ee:transform doc:name="Transform Message" doc:id="a025606f-1e02-4886-a206-6b94bd9730e7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"timestamp": payload,
+	"flow": flow.name
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="e380eee3-b2a0-4321-a7a3-d56ee4789e95" message="#[payload]" />
+    </flow>
+    <flow name="post:\pardotMc\lasttimestamp:application\json:api-config">
+		<os:store doc:name="Store" doc:id="bc3112d7-d810-4a10-8d12-45960219e6e0" key="mcLastDateTime" objectStore="mcreyObjectStore" >
+			<os:value ><![CDATA[#[payload.timestamp]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Transform Message" doc:id="0a8e034a-1eb2-40f8-b349-fc72bc1622a9" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="6f32f462-3ff8-4c2d-ade2-fafc79cb5459" message="#[payload]" />
+    </flow>
+    <flow name="post:\pardotRey\lasttimestamp:application\json:api-config">
+		<os:store doc:name="Store" doc:id="debbca3c-18f1-48c8-b55f-a80328c6bd8e" key="reyLastDateTime" objectStore="mcreyObjectStore" >
+			<os:value ><![CDATA[#[payload.timestamp]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Transform Message" doc:id="0f6355ec-3c80-44c2-99cc-7331032be4b1" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  Status: "successfully Updated",
+  "flow": flow.name
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="bb05d5ee-314b-4926-8f84-683cdab40744" message="#[payload]" />
+    </flow>
+</mule>

@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<sub-flow name="common-select-flow" doc:id="25b0b623-c702-4d3e-ae74-6e4e35f904e2" >
+		<logger level="INFO" doc:name="Logger" doc:id="3f805c04-c9a1-46fd-94b6-72f1c4ad1b70" message="Starting to query from database #[payload]"/>
+		<db:select doc:name="Select" doc:id="c0aad8f1-db31-4c37-8aa1-6bfc54ce5fc0" config-ref="Database_Config" queryTimeout="10" queryTimeoutUnit="MINUTES">
+			<db:sql ><![CDATA[#[payload.query]]]></db:sql>
+		</db:select>
+		<choice doc:name="Choice" doc:id="be09fe43-8afb-4484-b4a0-a9e7892fb693" >
+			<when expression="#[isEmpty(payload[3] default [])]">
+				<ee:transform doc:name="Transform Message" doc:id="fe3e24b9-56b4-41ca-bc4b-e2a8cbc7581f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="6fb25133-837d-4aeb-96a5-1f3c05e35f96" message="Response from database query :  #[payload]" />
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Copy_of_Transform Message" doc:id="742e1244-1dab-426a-87b0-fe0055f285f3" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="check-status" doc:id="b938ebac-dc09-4129-a8b4-059663444918" >
+		<os:retrieve doc:name="jobId" doc:id="8dcf41ce-e239-433b-9478-9db32bbf9662" key="#[vars.job]" objectStore="CommonbjectStore" target="jobId"/>
+		<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="821eebf9-686d-4ef4-8024-b9518948c75b" millisBetweenRetries="5000">
+			<salesforce:get-job-state-bulk-api-v2 doc:name="Get job state bulk api v 2" doc:id="675c29e5-9868-4c5f-91aa-f70c6921ee70" config-ref="Salesforce_Config" id="#[vars.jobId]"/>
+			<set-variable value="#[payload.state]" doc:name="jobstate" doc:id="d1781635-4808-43d8-b980-68f7369f872b" variableName="jobstate"/>
+			<choice doc:name="Check Job State" doc:id="dcfa733d-4a56-4789-8c97-ad9a1761e7f9" >
+				<when expression='#[vars.jobstate == "JobComplete"]' >
+					<logger level="INFO" doc:name="Processed Successfully" doc:id="2dbcfd3f-b885-4891-9a9e-347864daf0e1" message="Records Processed Succesfully in Salesforce :#[payload.id]" />
+					<choice doc:name="Choice" doc:id="ba475469-a84d-409d-91e2-9be1f27c497a" >
+						<when expression='#[payload.numberRecordsFailed == 0]'>
+							<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="23f9d367-12e7-44fd-b003-850ef08d4959" variableName="object" />
+							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job Success at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="bf69598d-c550-4820-b8fa-31e645932b9d" variableName="subject" />
+							<parse-template doc:name="Parse Template" doc:id="64e16c75-41d7-4fc8-b3cd-502f16bcd722" location="template/responseSuccessHtml.template" target="body" />
+							<flow-ref doc:name="smtp-sub-flow Reference" doc:id="fa1841a4-331e-45aa-b29a-2659d81ef2fa" name="smtp-sub-flow" />
+						</when>
+						<otherwise >
+						<set-variable value='#[if(payload."operation" == "insert" and payload."object" == "PricebookEntry") "Product2.External_ID__c" else if(payload."operation" == "insert" and payload."object" == "Task") "Vendor__r.Vendor_External_ID__c" else payload.externalIdFieldName]' doc:name="Set externalIdFieldName Variable" doc:id="a4d63560-64f4-403a-947b-a769a1b256e9" variableName="externalIdFieldName" />
+				<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="371d8c99-3662-4b62-b1a7-b15e1932b844" variableName="object" />
+				<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job completed with failed records at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="cc57f0eb-f6a0-402e-be21-7788f359b0ee" variableName="subject" />
+				<parse-template doc:name="Parse Template" doc:id="84980ca1-5adc-49a4-8ced-f59386b62453" target="body" location="template/responseHtml.template" />
+				<flow-ref doc:name="sf-failure-impl Reference" doc:id="0e685d55-0a34-4b24-8a97-4d50ead0b65e" name="sf-failure-impl" />
+				<ee:transform doc:name="attachment" doc:id="f250d3a9-8b4e-4736-a837-648d7ec79071">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="attachment"><![CDATA[%dw 2.0
+output application/csv
+---
+payload map ((item, index) ->  {
+	"Id": item.id,
+	"External_ID__c": (item."originalFields"[vars.externalIdFieldName default ""]),
+	"ErrorMessage": (item.errorMessage default "")
+})]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<set-payload value="#[{&#10;	fileName: vars.job ++ &quot;-&quot; ++ (vars.currentUpdateDate as DateTime as String {format: &quot;yyyyMMdd'T'HHmmss&quot;} default now() as String {format: &quot;yyyyMMdd'T'HHmmss&quot;}) ++ &quot;.csv&quot;&#10;}]" doc:name="Set Payload" doc:id="c4a4b29e-de32-405e-80ae-5a588a77fb5e" />
+				<flow-ref doc:name="smtp-attachment-sub-flow Reference" doc:id="eb2b91a0-b3a2-46f9-a232-5fbcd226887a" name="smtp-attachment-sub-flow1" />
+						</otherwise>
+					</choice>
+				
+				</when>
+				<when expression='#[vars.jobstate == "Failed"]' >
+					<logger level="INFO" doc:name="Job Failed" doc:id="913ab9c5-3a3a-4fc8-b743-3878a8cc01c0" message="Job Failed . #[payload.errorMessage]. #[payload.state]" />
+					<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="1ab26a71-58c0-4502-8161-b09196dd92f4" variableName="object" />
+					<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job Failed at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="4791b746-69c7-439e-8fe5-7b08da65e9d0" variableName="subject" />
+					<parse-template doc:name="Parse body Template" doc:id="1c0c7626-e120-4d42-94da-2e208ce50f8d" location="template/failedJobHTML.template" target="body" />
+					<flow-ref doc:name="smtp-sub-flow Reference" doc:id="ab340d82-89e5-4011-9c66-92cc08506e39" name="smtp-sub-flow" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Job Still Running" doc:id="92527488-7224-4331-9279-a36c3c738967" message="Going to Raise Exception for JobId : #[payload.id]" />
+					<ee:transform doc:name="Wait 2 seconds" doc:id="6be3a472-7dfc-4368-9a2f-810dfe3ab731">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="waitTime"><![CDATA[%dw 2.0
+import * from dw::Runtime
+output application/json
+---
+{ "waitTimeInMS" : 2000 } wait 2000]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<raise-error doc:name="Cause Retry (Not Successful)" doc:id="228a0225-2f38-40ff-8866-bed94e72634b" type="SF:JOB_IN_PROGRESS" description="Bulk API 2 is still in progress" />
+				</otherwise>
+			</choice>
+		</until-successful>
+		<logger level="INFO" doc:name="All Done" doc:id="a6a8ca94-ec70-448e-90a9-e88c386d30d9" message="All Done for JobId: #[vars.jobId]" />
+	</sub-flow>
+	<sub-flow name="check-status-product-retry" doc:id="fa5bf92c-bccc-4348-9fcb-962c07bd51b4" >
+		<os:retrieve doc:name="jobId" doc:id="25280128-9733-4bce-a676-d5e26aec9e94" key="#[vars.job]" objectStore="CommonbjectStore" target="jobId"/>
+		<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="fa0890b6-8945-4a90-9b6a-f4a1c2751d83" millisBetweenRetries="5000">
+			<salesforce:get-job-state-bulk-api-v2 doc:name="Get job state bulk api v 2" doc:id="2b39bf1c-ac9f-4f7f-b245-2e9edf894178" config-ref="Salesforce_Config" id="#[vars.jobId]"/>
+			<set-variable value="#[payload.state]" doc:name="jobstate" doc:id="64e178a8-351d-4b08-8097-ae046f42803b" variableName="jobstate"/>
+			<choice doc:name="Check Job State" doc:id="0fefd8ef-76b6-4423-a698-09d782de9463" >
+				<when expression='#[vars.jobstate == "JobComplete"]' >
+					<logger level="INFO" doc:name="Processed Successfully" doc:id="96372e9f-25e9-4276-8c35-47818ba21b4d" message="Records Processed Succesfully in Salesforce :#[payload.id]" />
+					<choice doc:name="Choice" doc:id="73c6a206-d4e5-4b2f-94e2-6369585f4f32" >
+						<when expression='#[payload.numberRecordsFailed == 0]'>
+							<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="ed68ad25-b18e-4557-9d1a-39b8f217339c" variableName="object" />
+							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job Success at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="743f12a3-8f0d-4a5e-877f-05b9aead4cae" variableName="subject" />
+							<parse-template doc:name="Parse Template" doc:id="6f18bd00-bc2f-452b-84e6-a473ba23a83f" location="template/responseSuccessHtml.template" target="body" />
+							<flow-ref doc:name="smtp-sub-flow Reference" doc:id="6f895954-e7a5-4f28-be44-3ab584b8a229" name="smtp-sub-flow" />
+						</when>
+						<otherwise >
+						<set-variable value='#[if(payload."operation" == "insert" and payload."object" == "PricebookEntry") "Product2.External_ID__c" else if(payload."operation" == "insert" and payload."object" == "Task") "Vendor__r.Vendor_External_ID__c" else payload.externalIdFieldName]' doc:name="Set externalIdFieldName Variable" doc:id="ec1c49ae-f839-4a8e-8d62-2fc2e0f14349" variableName="externalIdFieldName" />
+				<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="976bea44-e53f-4179-8d08-c97ee78af417" variableName="object" />
+				<os:store doc:name="Store jobId" doc:id="c8c96ca5-7c87-4c2c-acb5-278307a0da2f" key="#[vars.jobId]" objectStore="CreateProductobjectStore">
+								<os:value ><![CDATA[#[vars.jobId]]]></os:value>
+							</os:store>
+							<os:store doc:name="Store UpdateProductOrderLine" doc:id="c6edba2f-c1cc-4128-9389-ef8ea9c02d04" key="#[vars.jobId]" objectStore="UpdateProductOrderLineobjectStore">
+								<os:value ><![CDATA[vars.jobId]]></os:value>
+							</os:store>
+							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job completed with failed records at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="d72f8cfc-9385-4311-9756-b643910b09c2" variableName="subject" />
+				<parse-template doc:name="Parse Template" doc:id="67bc85e8-d592-4692-b291-aa887592c7b0" target="body" location="template/responseHtml.template" />
+				<flow-ref doc:name="sf-failure-impl Reference" doc:id="83ef05d8-7ac5-46e2-86d4-7ca96aae6efd" name="sf-failure-impl" />
+				<ee:transform doc:name="attachment" doc:id="eea5acbd-e9c1-442c-a2ec-2c919c1ae2a1">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="attachment"><![CDATA[%dw 2.0
+output application/csv
+---
+payload map ((item, index) ->  {
+	"Id": item.id,
+	"External_ID__c": (item."originalFields"[vars.externalIdFieldName default ""]),
+	"ErrorMessage": (item.errorMessage default "")
+})]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<set-payload value="#[{&#10;	fileName: vars.job ++ &quot;-&quot; ++ (vars.currentUpdateDate as DateTime as String {format: &quot;yyyyMMdd'T'HHmmss&quot;} default now() as String {format: &quot;yyyyMMdd'T'HHmmss&quot;}) ++ &quot;.csv&quot;&#10;}]" doc:name="Set Payload" doc:id="0fe022d0-2df9-4bb0-aa54-c4b7aa5162c5" />
+				<flow-ref doc:name="smtp-attachment-sub-flow Reference" doc:id="e389907f-abd6-41d1-8ed1-4cc9bafde8a1" name="smtp-attachment-sub-flow" />
+						</otherwise>
+					</choice>
+				
+				</when>
+				<when expression='#[vars.jobstate == "Failed"]' >
+					<logger level="INFO" doc:name="Job Failed" doc:id="442c1517-9792-4c78-ba7e-59576a99a58a" message="Job Failed . #[payload.errorMessage]. #[payload.state]" />
+					<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="e46be306-651c-45eb-bdc6-f24b61fd8f39" variableName="object" />
+					<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job Failed at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="7cbfdbb8-5022-45e1-96d0-f4f151489e19" variableName="subject" />
+					<parse-template doc:name="Parse body Template" doc:id="d01f263e-7727-44a3-b1f5-bb474f51b274" location="template/failedJobHTML.template" target="body" />
+					<flow-ref doc:name="smtp-sub-flow Reference" doc:id="bd69a06f-3739-44ff-b84d-233045eb52c7" name="smtp-sub-flow" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Job Still Running" doc:id="871626a2-cf72-4df6-b0c1-9f2f57046f82" message="Going to Raise Exception for JobId : #[payload.id]" />
+					<ee:transform doc:name="Wait 2 seconds" doc:id="f15ef81b-8d74-49fc-b928-52dc3ee2561d">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="waitTime"><![CDATA[%dw 2.0
+import * from dw::Runtime
+output application/json
+---
+{ "waitTimeInMS" : 2000 } wait 2000]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<raise-error doc:name="Cause Retry (Not Successful)" doc:id="67ad38c5-f69e-4596-91e6-e0aa4d2f6f1e" type="SF:JOB_IN_PROGRESS" description="Bulk API 2 is still in progress" />
+				</otherwise>
+			</choice>
+		</until-successful>
+		<logger level="INFO" doc:name="All Done" doc:id="85da3138-577b-4df3-865f-02c440d16dc6" message="All Done for JobId: #[vars.jobId]" />
+	</sub-flow>
+	<sub-flow name="check-status-quote-retry" doc:id="6b0b8ec5-38c7-463b-a1ab-f06b760f9e86" >
+		<os:retrieve doc:name="jobId" doc:id="060c73f0-2cdc-4ba8-a4b9-d92757deeeed" key="#[vars.job]" objectStore="CommonbjectStore" target="jobId"/>
+		<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="d8bf9e48-5138-434b-8a08-e745eb4e4e2a" millisBetweenRetries="5000">
+			<salesforce:get-job-state-bulk-api-v2 doc:name="Get job state bulk api v 2" doc:id="52fc0796-87df-47b3-a4de-4e967efa8efb" config-ref="Salesforce_Config" id="#[vars.jobId]"/>
+			<set-variable value="#[payload.state]" doc:name="jobstate" doc:id="970658a4-b2d6-4fde-8ebd-7b197f890903" variableName="jobstate"/>
+			<choice doc:name="Check Job State" doc:id="1dd4f9c4-6f80-4605-b716-665b8c290cae" >
+				<when expression='#[vars.jobstate == "JobComplete"]' >
+					<logger level="INFO" doc:name="Processed Successfully" doc:id="b5b65d5b-4c8b-4775-8c20-cc0461020ad5" message="Records Processed Succesfully in Salesforce :#[payload.id]" />
+					<choice doc:name="Choice" doc:id="179b95c9-da8d-411c-be25-0f384595ae54" >
+						<when expression='#[payload.numberRecordsFailed == 0]'>
+							<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="5e4fb36a-4558-4396-9e47-958361959c0b" variableName="object" />
+							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job Success at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="4a194359-a499-4a19-b2ee-aa75fad88e84" variableName="subject" />
+							<parse-template doc:name="Parse Template" doc:id="8b3cf8b6-7dfd-4e64-8873-f259677e89c2" location="template/responseSuccessHtml.template" target="body" />
+							<flow-ref doc:name="smtp-sub-flow Reference" doc:id="c7de438c-8a16-4188-bbae-6bb0bc8c38e7" name="smtp-sub-flow" />
+						</when>
+						<otherwise >
+						<set-variable value='#[if(payload."operation" == "insert" and payload."object" == "PricebookEntry") "Product2.External_ID__c" else if(payload."operation" == "insert" and payload."object" == "Task") "Vendor__r.Vendor_External_ID__c" else payload.externalIdFieldName]' doc:name="Set externalIdFieldName Variable" doc:id="34e9f515-9a93-4f5a-8994-0c462e406c39" variableName="externalIdFieldName" />
+				<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="c41e25de-98e3-4c8f-a35f-8ffcb1e7dac2" variableName="object" />
+				<os:store doc:name="Store jobId" doc:id="ab329d16-e0a2-4208-bfd2-13de3be79fc8" key="#[vars.jobId]" objectStore="CreateProductQuoteobjectStore">
+								<os:value ><![CDATA[#[vars.jobId]]]></os:value>
+							</os:store>
+							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job completed with failed records at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="a9c41452-7c88-4a26-b506-b6481f0bb406" variableName="subject" />
+				<parse-template doc:name="Parse Template" doc:id="406d4105-1122-4e20-a5a0-a1a18bde9aea" target="body" location="template/responseHtml.template" />
+				<flow-ref doc:name="sf-failure-impl Reference" doc:id="c4b322b2-1b35-4e2f-95bf-80a64a9ddc6b" name="sf-failure-impl" />
+				<ee:transform doc:name="attachment" doc:id="f881ae62-32ec-4397-8308-c993a94c906f">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="attachment"><![CDATA[%dw 2.0
+output application/csv
+---
+payload map ((item, index) ->  {
+	"Id": item.id,
+	"External_ID__c": (item."originalFields"[vars.externalIdFieldName default ""]),
+	"ErrorMessage": (item.errorMessage default "")
+})]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<set-payload value="#[{&#10;	fileName: vars.job ++ &quot;-&quot; ++ (vars.currentUpdateDate as DateTime as String {format: &quot;yyyyMMdd'T'HHmmss&quot;} default now() as String {format: &quot;yyyyMMdd'T'HHmmss&quot;}) ++ &quot;.csv&quot;&#10;}]" doc:name="Set Payload" doc:id="224efce5-351f-49db-87ad-d6cdd5117378" />
+				<flow-ref doc:name="smtp-attachment-sub-flow Reference" doc:id="de547ac6-9dfe-458d-8abf-c3fa71464b06" name="smtp-attachment-sub-flow1" />
+						</otherwise>
+					</choice>
+				
+				</when>
+				<when expression='#[vars.jobstate == "Failed"]' >
+					<logger level="INFO" doc:name="Job Failed" doc:id="51e15d66-f345-4c79-af60-23d7c27d0906" message="Job Failed . #[payload.errorMessage]. #[payload.state]" />
+					<set-variable value="#[payload.object]" doc:name="Set object Variable" doc:id="25e24eca-6f44-45a3-9827-328a0e630aa1" variableName="object" />
+					<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job Failed at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="67afc89c-c5df-4f0b-8f50-1e2246b824f9" variableName="subject" />
+					<parse-template doc:name="Parse body Template" doc:id="027ad28b-d85c-4b29-95e9-1c891f235da8" location="template/failedJobHTML.template" target="body" />
+					<flow-ref doc:name="smtp-sub-flow Reference" doc:id="687b98ea-0b30-440c-9081-5b01ffcb197e" name="smtp-sub-flow" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Job Still Running" doc:id="f31b4b20-d37a-4b17-9367-5961f4a774c6" message="Going to Raise Exception for JobId : #[payload.id]" />
+					<ee:transform doc:name="Wait 2 seconds" doc:id="e5138705-b322-4c73-974d-bf57888f391c">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="waitTime"><![CDATA[%dw 2.0
+import * from dw::Runtime
+output application/json
+---
+{ "waitTimeInMS" : 2000 } wait 2000]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<raise-error doc:name="Cause Retry (Not Successful)" doc:id="cc57d6d4-db1a-453d-8844-38d5ad7bad85" type="SF:JOB_IN_PROGRESS" description="Bulk API 2 is still in progress" />
+				</otherwise>
+			</choice>
+		</until-successful>
+		<logger level="INFO" doc:name="All Done" doc:id="4cb19c71-ae21-46ca-8d43-6b58fd2d55fb" message="All Done for JobId: #[vars.jobId]" />
+	</sub-flow>
+	<sub-flow name="smtp-attachment-sub-flow" doc:id="7a8eff97-c5be-414f-9710-249fddfbc81c" >
+		<try doc:name="Try" doc:id="26d15764-0b13-47b8-a0fb-32a4b130293c" >
+			<email:send doc:name="Send" doc:id="b3939dba-49fa-4e3c-9964-6dc602197319" config-ref="Outlook_SMTP" fromAddress="${smtp.fromAddress}" toAddresses="#[p('smtp.toAddress') splitBy ',']" subject="#[vars.subject default payload.subject]">
+			<email:body contentType="text/html">
+				<email:content><![CDATA[#[vars.body default payload.body]]]></email:content>
+			</email:body>
+			<email:attachments><![CDATA[#[{(payload.fileName): vars.attachment
+}]]]></email:attachments>
+		</email:send>
+			<error-handler >
+				<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="af5f62c0-a493-4a25-8d20-ba45705e5581" >
+					<logger level="ERROR" doc:name="Logger" doc:id="7800d888-8b40-40d0-9e04-41a11b12d2a8" message="Error while sending email, error: #[error.description]"/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+	</sub-flow>
+	<sub-flow name="smtp-sub-flow" doc:id="57f279f8-6fe7-4e4f-9ae7-4b7890e9748f" >
+		<try doc:name="Try" doc:id="62c43b87-acc2-4b85-b996-6449703e87d2" >
+			<email:send doc:name="Send" doc:id="65cabc1c-cd85-44a0-9f94-b1ecbf59d366" config-ref="Outlook_SMTP" fromAddress="${smtp.fromAddress}" subject="#[vars.subject]" toAddresses="#[p('smtp.toAddress') splitBy ',']">
+			<email:body contentType="text/html">
+				<email:content><![CDATA[#[vars.body]]]></email:content>
+			</email:body>
+		</email:send>
+			<error-handler >
+				<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="20477f63-2122-484e-b151-989ef1c3f4d2" >
+					<logger level="ERROR" doc:name="Logger" doc:id="4e525e6a-47ac-4d36-8e09-e5e4701c7d2a" message="Error while sending email, error: #[error.description]"/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+	</sub-flow>
+	<sub-flow name="opti-smtp-sub-flow" doc:id="924c5f68-3f10-48ea-a368-09933535229d" >
+		<choice doc:name="Choice" doc:id="c0dde2a9-35ed-4af0-bb07-b104f0f054c3" >
+			<when expression="#[(p('smtp.opti.send') as Boolean) == true]">
+				<try doc:name="Try" doc:id="a6f00252-48a3-4a46-81aa-c921eae09e7b">
+			<email:send doc:name="Send" doc:id="3794e1e2-7b4e-469d-a95d-8b9bf7d11216" config-ref="Outlook_SMTP" fromAddress="${smtp.opti.fromAddress}" subject="#[vars.subject]" toAddresses="#[p('smtp.opti.toAddress') splitBy ',']">
+			<email:body contentType="text/html">
+				<email:content><![CDATA[#[vars.body]]]></email:content>
+			</email:body>
+		</email:send>
+			<error-handler>
+				<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="5eb4d8b4-8347-4ddc-be9b-e6ef636f4a53">
+					<logger level="ERROR" doc:name="Logger" doc:id="1c52f989-ff0b-4a3b-b9d6-9f3a036d19f1" message="Error while sending email, error: #[error.description]" />
+				</on-error-continue>
+			</error-handler>
+		</try>
+			</when>
+		</choice>
+	</sub-flow>
+	<sub-flow name="smtp-attachment-sub-flow1" doc:id="687dee03-f1b8-4f41-9c4b-5f7d64c15f78" >
+		<choice doc:name="Choice" doc:id="8f005690-e7c8-43ed-99af-5f59855bf228" >
+			<when expression='#[vars.attachment != null and vars.attachment != ""]' >
+				<scatter-gather doc:name="Scatter-Gather" doc:id="ec8ddb45-74c6-484c-bcc8-7d799466dd1f" >
+					<route >
+						<try doc:name="Try" doc:id="f3defd25-76e8-410d-af4b-830c5c2c2989" >
+							<email:send doc:name="Send" doc:id="209b36c1-13bd-4499-8070-123c3ac6be8f" config-ref="Outlook_SMTP" fromAddress="${smtp.fromAddress}" subject="#[vars.subject default payload.subject]" toAddresses="#[p('smtp.toAddress') splitBy ',']" >
+								<email:body contentType="text/html" >
+									<email:content ><![CDATA[#[vars.body default payload.body]]]></email:content>
+								</email:body>
+								<email:attachments ><![CDATA[#[{(payload.fileName): vars.attachment
+}]]]></email:attachments>
+							</email:send>
+							<error-handler >
+								<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="128010ac-8811-46d0-8c4d-fc7a7426d46e" >
+									<logger level="ERROR" doc:name="Logger" doc:id="005eb40f-8c31-42cb-9634-8081ea3eebc3" message="Error while sending email, error: #[error.description]" />
+								</on-error-continue>
+							</error-handler>
+						</try>
+					</route>
+					<route >
+						<foreach doc:name="For Each" doc:id="2efcd71c-30b3-44ba-b08a-40a9133d56e1" collection="#[vars.attachment]" >
+							<ee:transform doc:name="Transform Message" doc:id="15c8fbc4-04a6-49eb-be19-3973762ae00f" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	ID: payload.Id reduce $$,
+	External_ID_C: payload.External_ID__c reduce $$,
+	ErrorMessage: payload.ErrorMessage reduce $$,
+	ErrorProcess: vars.object,
+	ErrorDate: now() as String {format: "yyyy-MM-dd hh:mm:ss.SSS"},
+	Status: "Active"
+}]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+							<db:insert doc:name="Insert" doc:id="a8526d29-1a37-42fe-ac17-9392dcab4adf" config-ref="Database_Config" >
+								<db:sql ><![CDATA[insert into Integration_ErrorLog (ID, External_ID_C, ErrorMessage, ErrorProcess, ErrorDate, Status) values (:ID, :External_ID_C, :ErrorMessage, :ErrorProcess, :ErrorDate, :Status)]]></db:sql>
+								<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+							</db:insert>
+						</foreach>
+					</route>
+				</scatter-gather>
+			</when>
+			<otherwise >
+				<try doc:name="Try" doc:id="8a628111-5d52-4bd8-808c-b49ab282103e" >
+					<email:send doc:name="Send" doc:id="9d813b8f-9486-4e69-b5b4-daff22c08918" config-ref="Outlook_SMTP" fromAddress="${smtp.fromAddress}" subject="#[vars.subject default payload.subject]" toAddresses="#[p('smtp.toAddress') splitBy ',']" >
+						<email:body contentType="text/html" >
+							<email:content ><![CDATA[#[vars.body default payload.body]]]></email:content>
+						</email:body>
+						<email:attachments ><![CDATA[#[{(payload.fileName): vars.attachment
+}]]]></email:attachments>
+					</email:send>
+					<error-handler >
+						<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="58c0a473-2628-4e31-99d0-fe2ea829483d" >
+							<logger level="ERROR" doc:name="Logger" doc:id="a6ad4d55-0ff3-4c17-ae16-0549e7de2093" message="Error while sending email, error: #[error.description]" />
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</otherwise>
+		</choice>
+	</sub-flow>
+</mule>

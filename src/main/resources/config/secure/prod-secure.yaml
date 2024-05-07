@@ -1,0 +1,17 @@
+db:
+  password: "![YGaHErGhNS2RJag+qZHF4w==]"
+tls:
+  password: "![ibIbraCwSX4j6079rsUhqg==]"
+sf:
+  password: "![6BPJgswP6CAA26mwftxKXOnQjNeL+m/azWATcX9Bl1o=]"
+  token: "![9vSU9jyunh8fQnq2pO/6a/wTfBKVzFnAiwwzt3XMu3I=]"
+  ps:
+    password: "![6BPJgswP6CAA26mwftxKXOnQjNeL+m/azWATcX9Bl1o=]"
+    token: "![9vSU9jyunh8fQnq2pO/6a/wTfBKVzFnAiwwzt3XMu3I=]"
+smtp:
+  password: "![jplBxtjP5iMEBMzqceQ0l7Wq0mMQ7mC+0EA5qzSIO4M=]"
+pardot:
+  client_secret: "![KTojTNhrXnepHJKjrfhGoqBj6hpNwOO+atQsMHTxWPttFSSe19Cg6hU+dsAN7Malx1k9Nv7UvCllD6BU16yBBXRU7hZfyLDRpULipmCHz3c=]"
+system:
+  mcmc:
+    token: "![yxkwowELcH0CsY2KM66zWSkIb4nSo/QE58zxvutpCRw=]"

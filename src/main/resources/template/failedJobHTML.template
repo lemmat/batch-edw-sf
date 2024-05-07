@@ -1,0 +1,40 @@
+<html>
+<style>
+	table,
+	th,
+	td {
+		border: 1px solid black;
+	}
+</style>
+
+<body>
+	<table>
+		<thead>
+			<tr>
+				<th colspan="6">Job Status -  #[payload.id]</th>
+			</tr>
+		</thead>
+		<thead>
+			<tr>
+				<th>CorrelationId</th>
+				<th>ObjectName</th>
+				<th>ErrorDescription</th>
+				<th>DatabaseStartDate</th>
+				<th>DatabaseRecordEndDate</th>
+				<th>Message</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>#[correlationId]</td>
+				<td>#[vars.object]</td>
+				<td>#[payload.errorMessage default "Unknown error"]</td>
+				<td>#[vars.lastUpdateDate]</td>
+				<td>#[vars.currentUpdateDate]</td>
+				<td>Some records in the job failed. Job data that was successfully processed isn’t rolled back.</td>
+			</tr>
+		</tbody>
+	</table>
+</body>
+
+</html>

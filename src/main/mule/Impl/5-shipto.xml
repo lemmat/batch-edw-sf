@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="shipto" doc:id="68d73e67-25ef-4730-9dbd-34b9a8c875f6" >
+		<!-- <scheduler doc:name="7_Scheduler" doc:id="7ec0c186-7694-4990-adf9-146d1060f186" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler> -->
+		<logger level="INFO" doc:name="Logger" doc:id="feb2afb3-90aa-470e-85bb-3ae047901d74" message="Job Triggered for ShipTo"/>
+		<set-variable value="shipto" doc:name="Set job Variable" doc:id="df8e0f5b-11d0-46bd-b000-b4deff6bb49c" variableName="job"/>
+		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="a769991b-9b90-4886-bc9b-9275d80b6e79" variableName="currentUpdateDate"/>
+		<os:retrieve doc:name="Retrieve shipto" doc:id="3125ba18-0a52-474c-9cbd-646a34baec36" key="shipto" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
+			<os:default-value><![CDATA[#[now() as DateTime as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="1955e97e-45a9-4a1f-a724-f59f238577ee" >
+			<when expression="#[(vars.isNightly default false) == true]">
+				<set-variable value="#[p('sql.nightly.shipto')]" doc:name="Set  SqlStatement Variable" doc:id="9727829e-0835-41a3-a461-83a11cfb7c92" variableName="sqlStatement" />
+			</when>
+			<otherwise >
+				<set-variable value="#[p('sql.shipto')]" doc:name="Set  SqlStatement Variable" doc:id="08d993ee-df49-45ec-af50-ad6d889b78e2" variableName="sqlStatement" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="49243964-cccb-4f14-9d20-83953689cf4b" message="ShipTo Statement: #[vars.sqlStatement], LastUpdateDate : #[vars.lastUpdateDate] , CurrentUpdateDate: #[vars.currentUpdateDate]"/>
+		<db:select doc:name="Select ShipTo" doc:id="3a2b6d19-335e-4752-975e-fcbf112e03ff" config-ref="Database_Config" queryTimeout="${db.querytimeoutminutes}" queryTimeoutUnit="MINUTES">
+			<db:sql><![CDATA[#[vars.sqlStatement]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	'LastUpdateDate': vars.lastUpdateDate,
+	'CurrentUpdateDate': vars.currentUpdateDate
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="payload" doc:id="b3cf6498-1c94-4f24-adac-9fe920e5ca9f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload as Iterator]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="shipto-batch-job" doc:id="1550254c-454e-49e4-88a6-b801d7bda434" maxFailedRecords="-1" blockSize="${batch.shipto.blocksize}" maxConcurrency="${batch.shipto.concurrency}" jobInstanceId='#["shipto-" ++ (now() as String {format:"yyyyMMddHHmmssSSS"})]'>
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="24b6ab08-0b0d-4a7a-8115-567603da3030" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="4b52601c-dde8-42ee-b33f-6da688b3810d" size="${batch.shipto.batch}">
+						<ee:transform doc:name="payload" doc:id="b85f78b3-fa3b-4479-95f9-c2b383b3a112" >
+							<ee:message >
+								<ee:set-payload resource="dw/shipto-upsert.dwl" />
+							</ee:message>
+						</ee:transform>
+						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="9ae1bcc8-50c5-4c80-b19e-e534d2205a89" millisBetweenRetries="${sf.interval}">
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="2e208dad-ac14-4cbb-afbb-edd53830469f" config-ref="Salesforce_Config" objectType="Ship_To__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+						</until-successful>
+						<logger level="INFO" doc:name="Logger" doc:id="b9d076ce-1259-4ff6-8eb9-ee0e5711117b" message="ShipTo UpsertResponse: #[output application/json indent=false --- payload]"/>
+						<os:store doc:name="jobId" doc:id="aeb0e910-abed-4626-b5bf-6ea33e95eb28" key="#[vars.job]" objectStore="CommonbjectStore" >
+							<os:value ><![CDATA[#[payload.id]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="check-status Reference" doc:id="a417ddd9-a739-4faf-8e22-5c90f63faf5b" name="check-status"/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step_Failure" doc:id="35ab995f-d190-4be4-823d-4ba17036dcd8" acceptPolicy="ONLY_FAILURES">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="ce409101-9cdb-4a79-8c35-89e1dcd57782" size="${batch.shipto.batch}">
+						<ee:transform doc:name="shipto" doc:id="72f1f7a3-41d7-4bd3-b92d-e5b3a17c4194" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "subject": "ShipTo records failed to publish to Salesforce  - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "body":  "ShipTo records failed to publish to Salesforce - from:" ++  (vars.lastUpdateDate default "") ++ " , to:" ++ (vars.currentUpdateDate default ""),
+    "fileName": vars.batchJobInstanceId ++ ".csv"
+}]]></ee:set-payload>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable resource="dw/shipto-upsert.dwl" variableName="attachment" />
+							</ee:variables>
+						</ee:transform>
+						<flow-ref doc:name="smtp-sub-flow Reference" doc:id="b312ec9e-7fa8-46a8-ab65-76f05e3e65fa" name="smtp-attachment-sub-flow"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<ee:transform doc:name="Transform Message" doc:id="0a6b7380-5f24-4efc-8d17-f8f77ca148ba" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+{
+	"Status": "Job Completed",
+	(payload)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<os:store doc:name="Store" doc:id="9b6383a8-c4fe-4a08-a256-0d7bd1f100a1" key="shipto" objectStore="LastTimeStampObjectStore">
+					<os:value><![CDATA[#[(vars.currentUpdateDate - |PT2H|) as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="91e8b712-60cf-4373-a351-2f0015a62db3" message="Job End for Shipto : #[payload]"/>
+				<choice doc:name="Choice" doc:id="1e1e8235-4722-42a3-9b90-b19f8307fc1b" >
+					<when expression='#[vars.scheme == "http"]'>
+						<logger level="INFO" doc:name="Logger" doc:id="a448d63c-5f00-4f6d-8b88-a81f0126c13c" message="Manual Trigger completed"/>
+					</when>
+					<otherwise>
+						<async doc:name="Async" doc:id="d30adbe3-fd55-45d2-b4ca-6a3aa15cc7d6" >
+							<flow-ref doc:name="account-manager-relationship Reference" doc:id="a1a17326-8392-4f6b-a7de-ee3d9789207f" name="account-manager-relationship" />
+						</async>
+					</otherwise>
+				</choice>
+			</batch:on-complete>
+		</batch:job>
+		<error-handler ref="batch-error-handler" />
+	</flow>
+	</mule>

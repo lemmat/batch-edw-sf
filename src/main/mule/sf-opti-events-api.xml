@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:cloudhub="http://www.mulesoft.org/schema/mule/cloudhub" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce-pub-sub="http://www.mulesoft.org/schema/mule/salesforce-pub-sub" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce-pub-sub http://www.mulesoft.org/schema/mule/salesforce-pub-sub/current/mule-salesforce-pub-sub.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/cloudhub http://www.mulesoft.org/schema/mule/cloudhub/current/mule-cloudhub.xsd">
+	<flow name="sf-opti-events-api" doc:id="b68a0f88-c62d-4e96-9d84-f44d65e7eed8" >
+		<salesforce-pub-sub:subscribe-channel-listener doc:name="Subscribe channel listener" doc:id="148febb7-6ce4-4c86-8d84-6ee815368e44" config-ref="Salesforce_PubSub_Config" channelName="${sf.ps.event}" >
+			<reconnect frequency="10000" count="200" />
+			<salesforce-pub-sub:replay-option >
+				<salesforce-pub-sub:replay-id-from-object-store osName="Object_store_replayId" osKey="replayId"/>
+			</salesforce-pub-sub:replay-option>
+		</salesforce-pub-sub:subscribe-channel-listener>
+		<logger level="INFO" doc:name="Event payload logger" doc:id="371e1d5f-b7ac-4a8f-ba74-1aa4b4928c0b" message="Event Received from SF: #[payload]" />
+		<set-variable value='#[payload]' doc:name="applicationData" doc:id="9c19330f-f977-4a34-bef6-6e0a4f4b8fe9" variableName="applicationData"/>
+		<set-variable value="#[payload.ReplayId]" doc:name="replayId" doc:id="cfb4a262-43f3-4ce0-835b-ed68c4c871ca" variableName="replayId"/>
+		<ee:transform doc:name="Mapping Xengage Request" doc:id="e1c76059-41b1-4bcb-8cc3-eec0f26bd929" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent=false
+---
+[{
+	"status": if(payload.Event."Credit_Decision__c" == "Approved with Conditions") ("Approved")
+            else if(payload.Event."Credit_Decision__c" == "Denied") ("Declined")
+            else (payload.Event."Credit_Decision__c"),
+	"applicantEmail": payload.Event."Contact_Email__c",
+	"customerNumber": payload.Event."Account_External_ID__c"
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Request Logger" doc:id="5c1407bd-4089-4a53-bca3-14cbef46cbd7" message="Request to Xengage : #[payload]"/>
+		<until-successful maxRetries="${system.retry.count}" doc:name="Until Successful" doc:id="0f3a6910-8751-49c3-af38-9c3428cb3f1d" millisBetweenRetries="${system.retry.interval}">
+			<try doc:name="Try" doc:id="2abb37c6-f5c4-455a-89f2-ef2fb245dfb1" >
+				<http:request method="POST" doc:name="MCMC update status" doc:id="76dd6783-31d1-4a17-8519-c5b38d86a8b2" config-ref="HTTP_Request_configuration" path="${system.mcmc.path}" responseTimeout="${system.mcmc.responsetimeout}">
+			<reconnect />
+			<http:headers><![CDATA[#[output application/json
+---
+{
+	"token" : p('secure::system.mcmc.token')
+}]]]></http:headers>
+		</http:request>
+				<error-handler >
+					<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="edae9066-80ff-4c34-9d2d-fc191dc31d90" type="HTTP:BAD_REQUEST">
+						<logger level="ERROR" doc:name="Logger" doc:id="9fc7c604-6578-4142-a1b2-ca3476d133fd" message="Error description: #[error.description]" />
+						<set-variable value='#["BAD-REQUEST : " ++ (error.muleMessage.typedValue.message default (error.description default "UNKNOWN"))]' doc:name="Set errorDescription Variable" doc:id="af0538ee-51a2-4e95-b528-8b4361be8bd6" variableName="errorDescription"/>
+						<set-variable value="#[p('env') ++ &quot;: BAD-REQUEST: for replyId:&quot; ++ vars.replayId ++ &quot; and timestamp:&quot; ++ ((now() &gt;&gt; &quot;EST&quot;) + |PT1H|) as String {format: &quot;MMddyyyHHmmss&quot;}]" doc:name="Set Subject Variable" doc:id="9ea88bda-9ed8-4fd3-bf91-ad27071c21ca" variableName="Subject"/>
+						<parse-template doc:name="Parse Template" doc:id="e6b1f4bb-ab27-4ace-a3cd-9c26ab3a0241" location="template/responsefailedHtmlOpti.template" target="body" />
+						<flow-ref doc:name="opti-smtp-sub-flow Reference" doc:id="5cc3eca7-9753-4ce3-8a1c-5b00cf603bae" name="opti-smtp-sub-flow"/>
+					</on-error-continue>
+				</error-handler>
+			</try>
+		</until-successful>
+		<ee:transform doc:name="Transform Message" doc:id="31ec7279-1d5d-4900-af12-0e36aaf89310">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json indent=false
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<os:store doc:name="Updating replayId in Object store" doc:id="8c7d8210-0115-41d4-be00-5723fa7911a0" key="replayId" objectStore="Object_store_replayId">
+			<os:value><![CDATA[#[vars.replayId default ""]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Response Logger" doc:id="185283df-c4fa-4ebc-8765-b6e2b0c28314" message="MCMC Response: #[payload]" />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="5deae4a0-4218-4ab7-b3e9-b1c40a84d059" >
+				<logger level="ERROR" doc:name="Logger" doc:id="ab34f4fe-6de5-4d9e-af50-55e55fa67192" message="Error description: #[error.description]"/>
+				<os:store doc:name="Updating replayId in Object store" doc:id="5e324e47-9be5-44f3-a153-f04506a8fc77" key="replayId" objectStore="Object_store_replayId">
+					<os:value><![CDATA[#[vars.replayId default ""]]]></os:value>
+				</os:store>
+				<set-variable value='#["ERROR : " ++ (error.errorType.asString default "UNKNOWN") ++ " : " ++ (error.description default "UNKNOWN")]' doc:name="Set errorDescription Variable" doc:id="4f19f3aa-4a81-4823-9cf8-7d78321fd1cf" variableName="errorDescription"/>
+				<set-variable value="#[p('env') ++ &quot;: ERROR: for replyId:&quot; ++ (vars.replayId default &quot;&quot;) ++ &quot; and timestamp:&quot; ++ ((now() &gt;&gt; &quot;EST&quot;) + |PT1H|) as String {format: &quot;MMddyyyHHmmss&quot;}]" doc:name="Set Subject Variable" doc:id="bc3c2f0b-bde5-4b7c-98e1-e6c50733824a" variableName="Subject" />
+				<parse-template doc:name="Parse Template" doc:id="0a90b234-110d-41da-b2dc-67afd87329d3" location="template/responsefailedHtmlOpti.template" target="body" />
+				<flow-ref doc:name="opti-smtp-sub-flow Reference" doc:id="7b2a3d4f-1e86-4885-b172-367145017e0e" name="opti-smtp-sub-flow" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+</mule>
