@@ -15,7 +15,7 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
 http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd">
 	<flow name="quote" doc:id="58e85a5f-9b72-4e10-bc8b-de9059cd4dc7">
-		<!-- <scheduler doc:name="12_Scheduler" doc:id="9ba9935e-9a57-4fd1-b614-68b614f6992d" >
+		<!--<scheduler doc:name="12_Scheduler" doc:id="9ba9935e-9a57-4fd1-b614-68b614f6992d" >
 			<scheduling-strategy >
 				<fixed-frequency frequency="1" timeUnit="DAYS"/>
 			</scheduling-strategy>
@@ -53,7 +53,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="da4b6936-23fb-4458-bbf4-a6cabc8d56ed" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="1a644dd4-4107-480d-bf85-76948a366cd3" config-ref="Salesforce_Config" objectType="Quote__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="1a644dd4-4107-480d-bf85-76948a366cd3" config-ref="Salesforce_Config" objectType="Quote__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="15556ab3-a231-4bbf-aa71-293adc675190" message="Quote UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="76f288f4-301a-461b-8a29-9f11b5033e2c" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -96,17 +96,15 @@ output application/json indent=false
 					</ee:message>
 				</ee:transform>
 				<os:store doc:name="Store" doc:id="14314ff1-2797-4434-9cd9-4225c987195f" key="quote" objectStore="LastTimeStampObjectStore">
-					<os:value><![CDATA[#[vars.currentUpdateDate]]]></os:value>
+					<os:value ><![CDATA[#[vars.currentUpdateDate]]]></os:value>
 				</os:store>
 				<logger level="INFO" doc:name="Logger" doc:id="b3b413ed-4065-4377-b29e-95d322e32aec" message="Job End for Quote : #[payload]"/>
 				<choice doc:name="Choice" doc:id="cfab3753-f977-4bd7-b5b3-38c4f2f20478">
 					<when expression='#[vars.scheme == "http"]'>
 						<logger level="INFO" doc:name="Logger" doc:id="29867452-aabb-49b3-9458-133befdccb16" message="Manual Trigger completed" />
 					</when>
-					<otherwise>
-						<async doc:name="Async" doc:id="5276b132-d8ba-4a22-aa73-68f22393ca67" >
-							<flow-ref doc:name="quotelines Reference" doc:id="0414e656-32a6-4998-8a9b-b1fc0b180c48" name="quotelines" />
-						</async>
+			<otherwise>
+				<flow-ref doc:name="quotelines Reference" doc:id="0414e656-32a6-4998-8a9b-b1fc0b180c48" name="quotelines" />
 					</otherwise>
 				</choice>
 				
@@ -148,7 +146,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="bda1d088-7542-42ed-8815-b29b9efed568" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="320ec860-2777-4f68-b25e-94fbfb63afb6" config-ref="Salesforce_Config" objectType="Quote_Line_Item__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="Quote_Line_Number__c" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="320ec860-2777-4f68-b25e-94fbfb63afb6" config-ref="Salesforce_Config" objectType="Quote_Line_Item__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="Quote_Line_Number__c"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="1e1ccfa6-4bca-4733-8c98-a61705f20eba" message="QuoteLines UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="f231ad3c-b5ce-4801-abed-a2175f3e5e8c" key="#[vars.job]" objectStore="CommonbjectStore" >

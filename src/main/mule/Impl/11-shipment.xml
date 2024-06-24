@@ -53,7 +53,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="719b71aa-08d8-4add-9d91-4c1d1438df37" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="ce0cb1f4-74f0-4d21-8475-47d49fd5a53c" config-ref="Salesforce_Config" objectType="Shipment__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="ce0cb1f4-74f0-4d21-8475-47d49fd5a53c" config-ref="Salesforce_Config" objectType="Shipment__c" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="0633d5b1-1bae-47bf-9477-7e85dff877ef" message="Shipment UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="142fbed3-68a9-4823-a61e-c9ade0f938bc" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -104,9 +104,7 @@ output application/json
 						<logger level="INFO" doc:name="Logger" doc:id="6b5beed5-89e0-4173-a7e6-dde73c564ec5" message="Manual Trigger completed" />
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="cf46a2b3-19ae-4570-b5a8-4083481a5228" >
-							<flow-ref doc:name="shipmentlines Reference" doc:id="58966248-1b65-4b0d-9542-222169ac8025" name="shipmentlines" />
-						</async>
+						<flow-ref doc:name="shipmentlines Reference" doc:id="58966248-1b65-4b0d-9542-222169ac8025" name="shipmentlines" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>
@@ -147,7 +145,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="d0451287-a54f-456b-baef-b882777b1274" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="469a7650-26cb-4805-8bdf-3197c3b3e87b" config-ref="Salesforce_Config" objectType="Shipment_Line_Item__c" operation="upsert" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="469a7650-26cb-4805-8bdf-3197c3b3e87b" config-ref="Salesforce_Config" objectType="Shipment_Line_Item__c" operation="upsert" externalIdFieldName="External_ID__c"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="63ed5306-52ad-4ea5-9402-4870d0cdedd2" message="Shipmentlines UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="c127659c-b78e-4b0e-8195-3db8121b0582" key="#[vars.job]" objectStore="CommonbjectStore" >

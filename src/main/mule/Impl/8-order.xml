@@ -16,11 +16,11 @@ http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/m
 http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
 	<flow name="order" doc:id="68d73e67-25ef-4730-9dbd-34b9a8c875f6">
-		<!-- <scheduler doc:name="11_Scheduler" doc:id="f8d387dc-64c4-43ce-b81e-d5a242812ba6" >
+		<!--<scheduler doc:name="11_Scheduler" doc:id="f8d387dc-64c4-43ce-b81e-d5a242812ba6" >
 			<scheduling-strategy >
 				<fixed-frequency frequency="1" timeUnit="DAYS"/>
 			</scheduling-strategy>
-		</scheduler> -->
+		</scheduler>-->
 		<logger level="INFO" doc:name="Logger" doc:id="8be2fe66-bc5f-468c-8688-9c2ea6656c7c" message="Job Triggered for Order"/>
 		<set-variable value="order" doc:name="Set job Variable" doc:id="a3f0d5ad-11e0-4d5d-84c8-5990c01dc1ca" variableName="job"/>
 		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="58d05e8a-e1ae-40b8-8180-2bf678963a83" variableName="currentUpdateDate"/>
@@ -54,7 +54,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="5ecb9d3b-29e6-4969-a886-222756aa4a6d" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="9f6d0a7d-4e85-4f2c-8315-e16b4110a7ce" config-ref="Salesforce_Config" objectType="Order" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="9f6d0a7d-4e85-4f2c-8315-e16b4110a7ce" config-ref="Salesforce_Config" objectType="Order" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="4d6d9891-0e6e-47d7-a887-d6c8a6f06686" message="Order UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="855c3adf-dd84-4558-9a5d-c0565fb95d6d" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -105,9 +105,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="d0313a8a-512f-431b-a5aa-181770aae4ab" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="d88a6c7e-64d8-4065-96e4-24ec8b4f5ea0" >
-							<flow-ref doc:name="orderLine-zero Reference" doc:id="13ab1a57-cdaf-4b53-b908-442fa1435ad9" name="orderLine-zero" />
-						</async>
+						<flow-ref doc:name="orderLine-zero Reference" doc:id="13ab1a57-cdaf-4b53-b908-442fa1435ad9" name="orderLine-zero" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>
@@ -148,7 +146,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="fd9b19a8-6a89-4195-8191-8ae45e10a179" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="d5b83e1f-0b1d-4cd5-bc71-fcec8a9b0253" config-ref="Salesforce_Config" objectType="OrderItem" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="d5b83e1f-0b1d-4cd5-bc71-fcec8a9b0253" config-ref="Salesforce_Config" objectType="OrderItem" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="eb863e9b-7a32-45c8-b78d-de9218681f4e" message="OrderLineszero UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="2f06668d-7dcb-4e87-aafe-8f588c8e99c4" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -199,9 +197,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="0821fa04-2bf0-4831-91f1-adc1c340a678" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="a0476cf0-975a-4349-8ad2-6045c130df94" >
-							<flow-ref doc:name="orderLine Reference" doc:id="99801c2d-ac89-43a1-8e32-2dce3eab48c8" name="orderLine" />
-						</async>
+						<flow-ref doc:name="orderLine Reference" doc:id="99801c2d-ac89-43a1-8e32-2dce3eab48c8" name="orderLine" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>
@@ -209,6 +205,11 @@ output application/json indent=false
 		<error-handler ref="batch-error-handler" />
 	</flow>
 	<flow name="orderLine" doc:id="1e435309-2c56-4ab1-9792-cab4625efcd3">
+	<!--<scheduler doc:name="Scheduler" doc:id="31ed59b1-1430-4c47-8e5b-6fd13b680e68" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</scheduler>-->
 		<logger level="INFO" doc:name="Logger" doc:id="c4a507d2-5019-40cf-a04e-2064f1f2f67b" message="Job Triggered for OrderLine"/>
 		<set-variable value="orderlines" doc:name="Set job Variable" doc:id="8e2dd909-72ab-4a8e-8a27-2b5f4ff82639" variableName="job"/>
 		<set-variable value="#[(now() &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="33ab5a86-daa3-47a0-93dc-49483cce1238" variableName="currentUpdateDate"/>
@@ -253,7 +254,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="a03488f1-9adf-4988-9a2f-61d496c23e32" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="e6c783f6-bf81-447e-b5ea-850c83e4e87f" config-ref="Salesforce_Config" objectType="OrderItem" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="e6c783f6-bf81-447e-b5ea-850c83e4e87f" config-ref="Salesforce_Config" objectType="OrderItem" operation="upsert" columnDelimiter="CARET" externalIdFieldName="External_ID__c"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="053439c0-6af9-403d-9be4-a40c5605ad97" message="OrderLines UpsertResponse: #[output application/json --- payload]"/>
 						<os:store doc:name="jobId" doc:id="d14eeada-9c4f-4041-86ca-4dcc541cc1fd" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -312,9 +313,7 @@ output application/json
 						<logger level="INFO" doc:name="Logger" doc:id="8c5afae5-3972-43fc-97d4-4c54006e7606" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="d4ab5711-d3f5-4a75-8171-acf0b719da7a" >
-							<flow-ref doc:name="invoice Reference" doc:id="70f64500-de09-4674-884d-1fda68fa5872" name="invoice" />
-						</async>
+						<flow-ref doc:name="invoice Reference" doc:id="70f64500-de09-4674-884d-1fda68fa5872" name="invoice" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>

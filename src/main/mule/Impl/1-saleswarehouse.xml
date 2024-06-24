@@ -59,7 +59,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="8a628b37-e696-43c7-b0d5-696987abf7ba" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job Branch__c" doc:id="97371233-b757-489b-9158-e6c86fd080c6" config-ref="Salesforce_Config" objectType="Branch__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job Branch__c" doc:id="97371233-b757-489b-9158-e6c86fd080c6" config-ref="Salesforce_Config" objectType="Branch__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="c35e0227-28e3-44da-a04a-7954d78fc39d" message="SalesWareHouse UpsertResponse: #[output application/json indent=false --- payload]" />
 						<os:store doc:name="jobId" doc:id="cb8e46fc-5614-4121-8605-f0ffae22ba58" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -110,9 +110,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="e323e342-eed8-47ff-91c7-714b87b357ff" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="5e21de59-5a80-49a8-9c1e-52dc2ca2bf77">
-								<flow-ref doc:name="customerReference" doc:id="e5da15c3-2e50-4673-928a-b82056958ec7" name="customer" />
-							</async>
+						<flow-ref doc:name="customerReference" doc:id="e5da15c3-2e50-4673-928a-b82056958ec7" name="customer" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>
@@ -120,7 +118,7 @@ output application/json indent=false
 		<error-handler ref="batch-error-handler" />
 	</flow>
 	<flow name="saleswarehouserelationship" doc:id="b242945c-92a2-4955-9dc2-101e05a56193" >
-		<!-- <scheduler doc:name="5_Scheduler" doc:id="af09e2e5-21bd-4d2b-a7dc-f0e24059ec4c" >
+		<!--<scheduler doc:name="5_Scheduler" doc:id="af09e2e5-21bd-4d2b-a7dc-f0e24059ec4c" >
 			<scheduling-strategy >
 				<fixed-frequency frequency="1" timeUnit="DAYS"/>
 			</scheduling-strategy>
@@ -161,7 +159,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="a110e57e-83ab-41dc-9484-7694cfd1f6af" >
-							<salesforce:create-job-bulk-api-v2 objectType="Branch_ID__c" operation="upsert" doc:name="Create job Branch_ID__c" doc:id="fa118146-ede2-4e5f-87b9-9b4384e721ac" config-ref="Salesforce_Config" externalIdFieldName="Branch_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 objectType="Branch_ID__c" operation="upsert" doc:name="Create job Branch_ID__c" doc:id="fa118146-ede2-4e5f-87b9-9b4384e721ac" config-ref="Salesforce_Config" externalIdFieldName="Branch_ID__c" columnDelimiter="CARET"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="c4abd06e-6417-4125-b376-3d1d0640d18d" message="SalesWareHouseRelationShip UpsertResponse: #[output application/json indent=false --- payload]" />
 						<os:store doc:name="jobId" doc:id="f684d8ca-27db-4374-af1f-29d239147b56" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -209,9 +207,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="ab8a3b23-f320-423c-9c3b-49061e14e1d3" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="9e1f12f4-88d5-4828-9112-defd149a44fd" >
-							<flow-ref doc:name="customer-number Reference" doc:id="365091b8-c964-49df-a051-fd2b5ed57767" name="customer-number" />
-						</async>
+						<flow-ref doc:name="customer-number Reference" doc:id="365091b8-c964-49df-a051-fd2b5ed57767" name="customer-number" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>

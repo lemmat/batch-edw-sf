@@ -157,4 +157,5 @@ type auto_687dee03_f1b8_4f41_9c4b_5f7d64c15f78_Output_Variables_object = String 
       </types:output-event>
     </types:processor-declaration>
   </types:enrichment>
+  <types:enrichment select="#e39790c7-8752-472a-834b-fac60296ab3b"/>
 </types:mule>

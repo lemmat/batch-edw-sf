@@ -3,7 +3,7 @@ output application/csv separator = '^'
 ---
 payload map (item) -> {
 	"Invoice_Number__c": item."OrderNumber",
-	"Account__r.External_Unique_ID__c": item."CustomerNumber",
+	"Account__r.Account_Number__c": item."CustomerNumber",
 	"Invoice_Date__c": item."InvoiceDate" as Date  default null,
 	"Order__r.External_ID__c": item."OrderNumber",
 	"Status__c": "Draft",

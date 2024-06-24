@@ -43,16 +43,16 @@ batch:
     batch: "5000"
   product: 
     concurrency: "1"
-    blocksize: "30000"
-    batch: "30000"
+    blocksize: "3500"
+    batch: "3500"
   order: 
     concurrency: "1"
     blocksize: "5000"
     batch: "5000"
   orderlines: 
     concurrency: "1"
-    blocksize: "5000"
-    batch: "5000"
+    blocksize: "4000"
+    batch: "4000"
   quote: 
     concurrency: "1"
     blocksize: "5000"
@@ -149,7 +149,7 @@ sql:
   product: "SELECT * FROM SalesForce.dbo.Product"
   order: "SELECT * FROM SalesForce.dbo.Order_Header WHERE Stage='Order'"
   orderzerolines: "SELECT * FROM SalesForce.dbo.Order_Header WHERE Stage='Order' and LineCount='0'"
-  orderlines: "SELECT * FROM SalesForce.dbo.Order_Lines WHERE  Stage='Order'"  
+  orderlines: "SELECT * FROM SalesForce.dbo.Order_Lines WHERE  Stage='Order'" 
   quote: "SELECT * FROM SalesForce.dbo.Order_Header WHERE Stage='Quote'"
   quotelines: "SELECT * FROM SalesForce.dbo.Order_Lines WHERE Stage = 'Quote'"
   invoice: "SELECT * FROM SalesForce.dbo.Invoice_Header WHERE Stage='Invoice' or Stage='Paid'"

@@ -130,22 +130,7 @@ output application/json
 							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job completed with failed records at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="d72f8cfc-9385-4311-9756-b643910b09c2" variableName="subject" />
 				<parse-template doc:name="Parse Template" doc:id="67bc85e8-d592-4692-b291-aa887592c7b0" target="body" location="template/responseHtml.template" />
 				<flow-ref doc:name="sf-failure-impl Reference" doc:id="83ef05d8-7ac5-46e2-86d4-7ca96aae6efd" name="sf-failure-impl" />
-				<ee:transform doc:name="attachment" doc:id="eea5acbd-e9c1-442c-a2ec-2c919c1ae2a1">
-					<ee:message>
-					</ee:message>
-					<ee:variables>
-						<ee:set-variable variableName="attachment"><![CDATA[%dw 2.0
-output application/csv
----
-payload map ((item, index) ->  {
-	"Id": item.id,
-	"External_ID__c": (item."originalFields"[vars.externalIdFieldName default ""]),
-	"ErrorMessage": (item.errorMessage default "")
-})]]></ee:set-variable>
-					</ee:variables>
-				</ee:transform>
-				<set-payload value="#[{&#10;	fileName: vars.job ++ &quot;-&quot; ++ (vars.currentUpdateDate as DateTime as String {format: &quot;yyyyMMdd'T'HHmmss&quot;} default now() as String {format: &quot;yyyyMMdd'T'HHmmss&quot;}) ++ &quot;.csv&quot;&#10;}]" doc:name="Set Payload" doc:id="0fe022d0-2df9-4bb0-aa54-c4b7aa5162c5" />
-				<flow-ref doc:name="smtp-attachment-sub-flow Reference" doc:id="e389907f-abd6-41d1-8ed1-4cc9bafde8a1" name="smtp-attachment-sub-flow" />
+							<logger level="INFO" doc:name="Logger" doc:id="e499dac8-efd0-409b-8cec-3db42165610e" message="There are failed records that are going to be reprocessed"/>
 						</otherwise>
 					</choice>
 				
@@ -199,22 +184,7 @@ output application/json
 							<set-variable value="#[output application/json --- upper(p('env')) ++ &quot; - &quot; ++ vars.job ++ &quot; : Job completed with failed records at Timestamp:&quot;++ (vars.currentUpdateDate default now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;})]" doc:name="Set subject Variable" doc:id="a9c41452-7c88-4a26-b506-b6481f0bb406" variableName="subject" />
 				<parse-template doc:name="Parse Template" doc:id="406d4105-1122-4e20-a5a0-a1a18bde9aea" target="body" location="template/responseHtml.template" />
 				<flow-ref doc:name="sf-failure-impl Reference" doc:id="c4b322b2-1b35-4e2f-95bf-80a64a9ddc6b" name="sf-failure-impl" />
-				<ee:transform doc:name="attachment" doc:id="f881ae62-32ec-4397-8308-c993a94c906f">
-					<ee:message>
-					</ee:message>
-					<ee:variables>
-						<ee:set-variable variableName="attachment"><![CDATA[%dw 2.0
-output application/csv
----
-payload map ((item, index) ->  {
-	"Id": item.id,
-	"External_ID__c": (item."originalFields"[vars.externalIdFieldName default ""]),
-	"ErrorMessage": (item.errorMessage default "")
-})]]></ee:set-variable>
-					</ee:variables>
-				</ee:transform>
-				<set-payload value="#[{&#10;	fileName: vars.job ++ &quot;-&quot; ++ (vars.currentUpdateDate as DateTime as String {format: &quot;yyyyMMdd'T'HHmmss&quot;} default now() as String {format: &quot;yyyyMMdd'T'HHmmss&quot;}) ++ &quot;.csv&quot;&#10;}]" doc:name="Set Payload" doc:id="224efce5-351f-49db-87ad-d6cdd5117378" />
-				<flow-ref doc:name="smtp-attachment-sub-flow Reference" doc:id="de547ac6-9dfe-458d-8abf-c3fa71464b06" name="smtp-attachment-sub-flow1" />
+							<logger level="INFO" doc:name="Logger" doc:id="937a91fb-090f-45fc-a4be-96ea229e2361" message="There are failed records that will be reprocessed"/>
 						</otherwise>
 					</choice>
 				

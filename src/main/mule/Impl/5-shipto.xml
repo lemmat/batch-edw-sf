@@ -15,16 +15,16 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
 http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
 	<flow name="shipto" doc:id="68d73e67-25ef-4730-9dbd-34b9a8c875f6" >
-		<!-- <scheduler doc:name="7_Scheduler" doc:id="7ec0c186-7694-4990-adf9-146d1060f186" >
+	<!--<scheduler doc:name="7_Scheduler" doc:id="7ec0c186-7694-4990-adf9-146d1060f186" >
 			<scheduling-strategy >
 				<fixed-frequency frequency="1" timeUnit="DAYS"/>
 			</scheduling-strategy>
-		</scheduler> -->
+		</scheduler>-->
 		<logger level="INFO" doc:name="Logger" doc:id="feb2afb3-90aa-470e-85bb-3ae047901d74" message="Job Triggered for ShipTo"/>
 		<set-variable value="shipto" doc:name="Set job Variable" doc:id="df8e0f5b-11d0-46bd-b000-b4deff6bb49c" variableName="job"/>
 		<set-variable value="#[(now()  + |PT1H| &gt;&gt; &quot;EST&quot;) as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set currentUpdateDate Variable" doc:id="a769991b-9b90-4886-bc9b-9275d80b6e79" variableName="currentUpdateDate"/>
 		<os:retrieve doc:name="Retrieve shipto" doc:id="3125ba18-0a52-474c-9cbd-646a34baec36" key="shipto" objectStore="LastTimeStampObjectStore" target="lastUpdateDate">
-			<os:default-value><![CDATA[#[now() as DateTime as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+			<os:default-value ><![CDATA[#[now() as DateTime as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
 		</os:retrieve>
 		<choice doc:name="Choice" doc:id="1955e97e-45a9-4a1f-a724-f59f238577ee" >
 			<when expression="#[(vars.isNightly default false) == true]">
@@ -60,7 +60,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="9ae1bcc8-50c5-4c80-b19e-e534d2205a89" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="2e208dad-ac14-4cbb-afbb-edd53830469f" config-ref="Salesforce_Config" objectType="Ship_To__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="2e208dad-ac14-4cbb-afbb-edd53830469f" config-ref="Salesforce_Config" objectType="Ship_To__c" operation="upsert" externalIdFieldName="External_ID__c" columnDelimiter="CARET"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="b9d076ce-1259-4ff6-8eb9-ee0e5711117b" message="ShipTo UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="aeb0e910-abed-4626-b5bf-6ea33e95eb28" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -111,9 +111,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="a448d63c-5f00-4f6d-8b88-a81f0126c13c" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="d30adbe3-fd55-45d2-b4ca-6a3aa15cc7d6" >
-							<flow-ref doc:name="account-manager-relationship Reference" doc:id="a1a17326-8392-4f6b-a7de-ee3d9789207f" name="account-manager-relationship" />
-						</async>
+						<flow-ref doc:name="account-manager-relationship Reference" doc:id="a1a17326-8392-4f6b-a7de-ee3d9789207f" name="account-manager-relationship" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>

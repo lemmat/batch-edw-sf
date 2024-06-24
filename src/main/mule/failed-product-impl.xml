@@ -55,9 +55,9 @@ finalResult distinctBy ((item, index) -> item) default []]]></ee:set-payload>
 			</choice>
 		</foreach>
 				<try doc:name="Try" doc:id="d300e950-b32a-41c8-b325-bb24d0c4b989" >
-					<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="2b8861f0-4680-41b4-b49a-51f427e09c88" millisBetweenRetries="5000">
-					<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="d20f08ee-859d-4f8b-9eb8-7b4bbd15d8d8" objectStore="CreateProductobjectStore" />
-					<choice doc:name="Choice" doc:id="6aa7861b-c2fe-4c11-af4c-8ba8938f6d11">
+					<until-successful maxRetries="3600" doc:name="Until Successful" doc:id="dfb49fbd-08f4-4708-8202-262507c0d640" millisBetweenRetries="5000">
+						<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="d20f08ee-859d-4f8b-9eb8-7b4bbd15d8d8" objectStore="CreateProductobjectStore" />
+						<choice doc:name="Choice" doc:id="6aa7861b-c2fe-4c11-af4c-8ba8938f6d11">
 					<when expression="#[isEmpty(payload)]">
 							<logger level="INFO" doc:name="Logger" doc:id="007e94e3-f632-4e91-94f7-c7e9b54cafd5" message="All error records processed" />
 						</when>
@@ -65,7 +65,7 @@ finalResult distinctBy ((item, index) -> item) default []]]></ee:set-payload>
 						<raise-error doc:name="Raise error" doc:id="216864bd-dddf-4ac6-bb6d-904c18226ef9" type="RETRY:ERROR" description="Retry is in progress for failed Products in orderline" />
 					</otherwise>
 				</choice>
-				</until-successful>
+					</until-successful>
 					<error-handler >
 						<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="df9163bd-ba09-4c83-96e6-c9cdd20a0439" >
 							<logger level="ERROR" doc:name="Logger" doc:id="ab545bbd-eb51-4cc6-9b55-3bfd18c2a865" message="Error Checking the status of job of product retry for orderlines, Ignore and continue , Error: #[error.description]"/>
@@ -79,10 +79,8 @@ finalResult distinctBy ((item, index) -> item) default []]]></ee:set-payload>
 							<os:value ><![CDATA[#[vars.lastUpdateDate default (now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
 						</os:store>
 						<logger level="INFO" doc:name="Logger" doc:id="66c48456-531e-4691-bf41-00bf87173873" message="Trigger to Reprocess the failed orderLines Flow"/>
-						<async doc:name="Async" doc:id="0a8c159c-a6cf-450d-9199-283edcc2547a" >
-							<set-variable value="http" doc:name="Set scheme Variable" doc:id="5e710b99-d653-4b6c-87d9-9561eebf3c4f" variableName="scheme" />
-							<flow-ref doc:name="orderLine Reference" doc:id="1d29e4ac-463d-48b2-81b1-355109235ff2" name="orderlines-failed-pricebook" />
-						</async>
+						<set-variable value="http" doc:name="Set scheme Variable" doc:id="5e710b99-d653-4b6c-87d9-9561eebf3c4f" variableName="scheme" />
+						<flow-ref doc:name="orderLine Reference" doc:id="1d29e4ac-463d-48b2-81b1-355109235ff2" name="orderlines-failed-pricebook" />
 					</when>
 					<otherwise >
 						<logger level="INFO" doc:name="Logger" doc:id="e9a57276-da88-4a31-94fe-a90542b5c697" message="No records to process the failure products"/>
@@ -266,10 +264,8 @@ finalResult distinctBy ((item, index) -> item) default []]]></ee:set-payload>
 							<os:value ><![CDATA[#[vars.lastUpdateDate default (now() - |P1D| >> "EST") as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:value>
 						</os:store>
 						<logger level="INFO" doc:name="Logger" doc:id="07f8dee9-68f4-4f4e-9b13-f34e1c8b02f8" message="Trigger to Reprocess the failed quotelines Flow"/>
-						<async doc:name="Async" doc:id="6f9d9138-b4c4-49dc-ae00-7e369d4af6cc" >
-							<set-variable value="http" doc:name="Set scheme Variable" doc:id="eade06ef-3833-4982-8093-fd7b5c8d614a" variableName="scheme" />
-							<flow-ref doc:name="quotelines Reference" doc:id="2dfb8ed8-d654-412c-9907-9d35b78f726e" name="quotelines" />
-						</async>
+						<set-variable value="http" doc:name="Set scheme Variable" doc:id="eade06ef-3833-4982-8093-fd7b5c8d614a" variableName="scheme" />
+						<flow-ref doc:name="quotelines Reference" doc:id="2dfb8ed8-d654-412c-9907-9d35b78f726e" name="quotelines" />
 					</when>
 					<otherwise >
 						<logger level="INFO" doc:name="Logger" doc:id="b93340ea-8d91-4839-9303-cc29307f5fd7" message="No records to process the failure products"/>

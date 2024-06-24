@@ -4,7 +4,7 @@ output application/csv separator='^'
 payload map (item) -> {
 	"Name": item."AccountName" replace /['\r\n|"']/ with "",
 	"RecordTypeId": p('record.customer'),
-	"External_Unique_ID__c": item."AccountNumber" as String default null,
+	"Account_Number__c": item."AccountNumber" as String default null,
 	"AccountNumber": item."AccountNumber" as String,
 	"BillingStreet": ((item."BillingAddress01" default "") ++ (item."BillingAddress02" default "") ++ (item."BillingAddress03" default "")) replace /['\r\n|"']/ with "",
 	"BillingCity": item."BillingCity",

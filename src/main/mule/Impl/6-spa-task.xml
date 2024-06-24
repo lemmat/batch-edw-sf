@@ -108,7 +108,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="985efce4-795b-473b-a6d4-0499392f5160" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create task Job bulk api v 2" doc:id="196e7078-e57c-4cd7-b7e4-e2ba3bd7fab2" config-ref="Salesforce_Config" objectType="task" operation="insert" columnDelimiter="CARET" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create task Job bulk api v 2" doc:id="196e7078-e57c-4cd7-b7e4-e2ba3bd7fab2" config-ref="Salesforce_Config" objectType="task" operation="insert" columnDelimiter="CARET" />
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="e56f2a40-7cf0-42e5-b58c-f4ecc082dad1" message="SPATask CreateResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="84fd7869-2be0-44db-a1f0-94bee078d125" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -166,9 +166,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="1b17ca4e-3efc-4fbe-be3d-c73432108817" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="4ca96443-58f4-442f-98b8-641d46ea87f1" >
-							<flow-ref doc:name="quote Reference" doc:id="9c990306-977e-40e9-911d-432c83be8e77" name="quote" />
-						</async>
+						<flow-ref doc:name="quote Reference" doc:id="9c990306-977e-40e9-911d-432c83be8e77" name="quote" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>

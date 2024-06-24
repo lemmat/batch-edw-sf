@@ -60,7 +60,7 @@ payload as Iterator]]></ee:set-payload>
 							</ee:message>
 						</ee:transform>
 						<until-successful maxRetries="#[p('sf.retry') as Number]" doc:name="Until Successful" doc:id="045532cb-5891-4285-8522-873908ee2039" millisBetweenRetries="${sf.interval}">
-							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="199f97ce-935b-4ac0-b666-5b6a26dbd396" config-ref="Salesforce_Config" objectType="Customer_Number__c" operation="upsert" externalIdFieldName="Customer_Number__c" columnDelimiter="CARET" lineEnding="CRLF"/>
+							<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="199f97ce-935b-4ac0-b666-5b6a26dbd396" config-ref="Salesforce_Config" objectType="Customer_Number__c" operation="upsert" externalIdFieldName="Customer_Number__c" columnDelimiter="CARET"/>
 						</until-successful>
 						<logger level="INFO" doc:name="Logger" doc:id="4dbdad8e-a043-4b70-b634-e1974dcfdd24" message="CustomerNumber UpsertResponse: #[output application/json indent=false --- payload]"/>
 						<os:store doc:name="jobId" doc:id="8e92da57-2ace-47dd-b442-0dbd6b8e3874" key="#[vars.job]" objectStore="CommonbjectStore" >
@@ -111,9 +111,7 @@ output application/json indent=false
 						<logger level="INFO" doc:name="Logger" doc:id="64e6cd10-65d8-4ae1-8ae6-f95dcea514e1" message="Manual Trigger completed"/>
 					</when>
 					<otherwise>
-						<async doc:name="Async" doc:id="7760bba0-ff0e-4ae8-95cc-42b441530d1a" >
-							<flow-ref doc:name="shipto Reference" doc:id="6a5816d2-2962-46ed-8ca0-9dc3190fd49d" name="shipto" />
-						</async>
+						<flow-ref doc:name="shipto Reference" doc:id="6a5816d2-2962-46ed-8ca0-9dc3190fd49d" name="shipto" />
 					</otherwise>
 				</choice>
 			</batch:on-complete>

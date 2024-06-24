@@ -2,7 +2,7 @@
 output application/csv separator = '^'
 ---
 payload map ((item, index) ->{
-	"External_ID__c": item."LineItemID",
+	"External_ID__c": item."LineItemID" replace /['\r\n|"']/ with "",
 	"Invoice__r.External_ID__c": item."OrderNumber",
 	"Name": item."OrderNumber",
 	"Product__r.External_ID__c": item."Shipprod" replace /['\r\n|"']/ with "",

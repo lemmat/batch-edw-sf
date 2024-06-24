@@ -30,5 +30,5 @@ payload map (item) -> {
 	"Origin_Code__c": item."OriginCode",
 	"Origin_Name__c": item."OriginName",
 	"Customer_PO__c": item."CustomerPO",
-	"Account__r.External_Unique_ID__c": item."CustomerNumber"
+	"Account__r.Account_Number__c": item."CustomerNumber"
 }
